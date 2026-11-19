@@ -247,6 +247,60 @@ class EmojiEngine:
                         "reason": f"gameplay_event: kill ({status})",
                         "source_signal": "kill",
                     })
+                elif ev_type == "jumpscare":
+                    raw_events.append({
+                        "global_time": ev_time,
+                        "emoji": "😱",
+                        "category": "shock",
+                        "confidence": round(min(1.0, max(0.95, conf)), 2),
+                        "reason": f"gameplay_event: jumpscare ({status})",
+                        "source_signal": "jumpscare",
+                    })
+                elif ev_type == "panic_escape":
+                    raw_events.append({
+                        "global_time": ev_time,
+                        "emoji": "🏃",
+                        "category": "disbelief",
+                        "confidence": round(min(1.0, max(0.85, conf)), 2),
+                        "reason": f"gameplay_event: panic_escape ({status})",
+                        "source_signal": "panic_escape",
+                    })
+                elif ev_type == "comedic_moment":
+                    raw_events.append({
+                        "global_time": ev_time,
+                        "emoji": "😂",
+                        "category": "funny",
+                        "confidence": round(min(1.0, max(0.90, conf)), 2),
+                        "reason": f"gameplay_event: comedic_moment ({status})",
+                        "source_signal": "comedic_moment",
+                    })
+                elif ev_type == "story_climax":
+                    raw_events.append({
+                        "global_time": ev_time,
+                        "emoji": "🤯",
+                        "category": "shock",
+                        "confidence": round(min(1.0, max(0.90, conf)), 2),
+                        "reason": f"gameplay_event: story_climax ({status})",
+                        "source_signal": "story_climax",
+                    })
+                elif ev_type == "chaos_burst":
+                    raw_events.append({
+                        "global_time": ev_time,
+                        "emoji": "💥",
+                        "category": "fire",
+                        "confidence": round(min(1.0, max(0.88, conf)), 2),
+                        "reason": f"gameplay_event: chaos_burst ({status})",
+                        "source_signal": "chaos_burst",
+                    })
+                elif ev_type == "boss_fight_climax":
+                    raw_events.append({
+                        "global_time": ev_time,
+                        "emoji": "⚔️",
+                        "category": "fire",
+                        "confidence": round(min(1.0, max(0.92, conf)), 2),
+                        "reason": f"gameplay_event: boss_fight_climax ({status})",
+                        "source_signal": "boss_fight_climax",
+                    })
 
         # 3. Filter by minimum confidence threshold
         qualified = [e for e in raw_events if e["confidence"] >= self.min_confidence]

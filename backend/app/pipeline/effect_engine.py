@@ -721,6 +721,11 @@ class EffectEngine:
         has_facecam = facecam_info and facecam_info.get("facecam_detected", False)
         focal_point = (0.50, 0.65) if has_facecam else (0.50, 0.50)
 
+        effect_style = candidate.get("effect_style", "balanced")
+        max_effects_per_min = candidate.get("max_effects_per_minute", 10)
+        if effect_style == "cinematic_comedy":
+            max_effects_per_min = min(max_effects_per_min, 6)
+
         gameplay_events = candidate.get("gameplay_events", [])
         for ev in gameplay_events:
             ev_dict = ev if isinstance(ev, dict) else (ev.to_dict() if hasattr(ev, "to_dict") else vars(ev))
@@ -810,6 +815,113 @@ class EffectEngine:
                         source_events=["gameplay_climax"],
                     )
                 )
+            elif ev_type == "jumpscare":
+                dur_z = IMPACT_ZOOM_DURATION
+                dur_s = IMPACT_SHAKE_DURATION
+                dur_f = FLASH_DURATION
+                z_start = max(0.0, rel_t - dur_z * 0.25)
+                z_end = min(clip_duration, z_start + dur_z)
+                s_start = max(0.0, rel_t - dur_s * 0.15)
+                s_end = min(clip_duration, s_start + dur_s)
+                f_start = max(0.0, rel_t - dur_f * 0.15)
+                f_end = min(clip_duration, f_start + dur_f)
+
+                raw_effects.append(
+                    EffectEvent(
+                        type=EFFECT_IMPACT_ZOOM,
+                        start=z_start,
+                        end=z_end,
+                        intensity=0.98,
+                        confidence=ev_conf,
+                        reason="horror:jumpscare_zoom",
+                        source_events=["jumpscare"],
+                        focal_point=focal_point,
+                    )
+                )
+                raw_effects.append(
+                    EffectEvent(
+                        type=EFFECT_IMPACT_SHAKE,
+                        start=s_start,
+                        end=s_end,
+                        intensity=0.95,
+                        confidence=ev_conf,
+                        reason="horror:jumpscare_shake",
+                        source_events=["jumpscare"],
+                    )
+                )
+                raw_effects.append(
+                    EffectEvent(
+                        type=EFFECT_EMPHASIS_FLASH,
+                        start=f_start,
+                        end=f_end,
+                        intensity=0.90,
+                        confidence=ev_conf,
+                        reason="horror:jumpscare_flash",
+                        source_events=["jumpscare"],
+                    )
+                )
+            elif ev_type == "panic_escape":
+                dur_s = MICRO_SHAKE_DURATION
+                s_start = max(0.0, rel_t - dur_s * 0.25)
+                s_end = min(clip_duration, s_start + dur_s)
+                raw_effects.append(
+                    EffectEvent(
+                        type=EFFECT_MICRO_SHAKE,
+                        start=s_start,
+                        end=s_end,
+                        intensity=0.80,
+                        confidence=ev_conf,
+                        reason="horror:panic_escape",
+                        source_events=["panic_escape"],
+                    )
+                )
+            elif ev_type in ("story_climax", "comedic_moment"):
+                # Clean cinematic subtle punch zoom — NO aggressive shake on dialogue
+                dur_z = PUNCH_ZOOM_DURATION
+                z_start = max(0.0, rel_t - dur_z * 0.35)
+                z_end = min(clip_duration, z_start + dur_z)
+                raw_effects.append(
+                    EffectEvent(
+                        type=EFFECT_PUNCH_ZOOM,
+                        start=z_start,
+                        end=z_end,
+                        intensity=0.75,
+                        confidence=ev_conf,
+                        reason=f"story:{ev_type}",
+                        source_events=[ev_type],
+                        focal_point=focal_point,
+                    )
+                )
+            elif ev_type in ("chaos_burst", "boss_fight_climax"):
+                dur_z = IMPACT_ZOOM_DURATION
+                dur_s = MICRO_SHAKE_DURATION
+                z_start = max(0.0, rel_t - dur_z * 0.30)
+                z_end = min(clip_duration, z_start + dur_z)
+                s_start = max(0.0, rel_t - dur_s * 0.20)
+                s_end = min(clip_duration, s_start + dur_s)
+                raw_effects.append(
+                    EffectEvent(
+                        type=EFFECT_IMPACT_ZOOM,
+                        start=z_start,
+                        end=z_end,
+                        intensity=0.90,
+                        confidence=ev_conf,
+                        reason=f"story:{ev_type}",
+                        source_events=[ev_type],
+                        focal_point=focal_point,
+                    )
+                )
+                raw_effects.append(
+                    EffectEvent(
+                        type=EFFECT_MICRO_SHAKE,
+                        start=s_start,
+                        end=s_end,
+                        intensity=0.80,
+                        confidence=ev_conf,
+                        reason=f"story:{ev_type} (micro_shake)",
+                        source_events=[ev_type],
+                    )
+                )
 
         # Direct sequence climaxes if available
         gameplay_sequences = candidate.get("gameplay_sequences", [])
@@ -853,6 +965,7 @@ class EffectEngine:
         final_effects, cooldown_suppressed = self.resolve_conflicts_and_cooldowns(
             raw_effects=raw_effects,
             clip_duration=clip_duration,
+            max_effects_per_min=max_effects_per_min,
         )
 
         all_suppressed = initial_suppressed + cooldown_suppressed

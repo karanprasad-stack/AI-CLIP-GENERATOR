@@ -19,6 +19,7 @@ export interface ProcessingSettings {
   llm: boolean
   quality_preset: 'Standard' | 'High' | 'Very High' | 'Custom'
   aspect_ratio?: '9:16' | '1:1'
+  game_mode?: 'auto' | 'valorant' | 'competitive_fps' | 'story_open_world' | 'horror_survival' | 'generic'
   resolution: string
   fps: number
   target_lufs: number
@@ -195,6 +196,9 @@ export interface Candidate {
   source_position_str?: string
   publishability?: PublishabilityInfo
   aspect_ratio?: string
+  game_archetype?: string
+  detected_game_title?: string
+  effect_style?: string
   rendered?: boolean
   output?: CandidateOutput | null
 }

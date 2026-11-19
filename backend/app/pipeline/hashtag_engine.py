@@ -31,7 +31,8 @@ class HashtagEngine:
             if clean_game.lower() == "csgo":
                 raw_tags.append("#CounterStrike")
 
-        # 2b. Verified Gameplay Event Tags (Phase 12C)
+        # 2b. Verified Gameplay Event Tags (Phase 12C + Multi-Genre)
+        ev = summary.primary_event.strip().lower()
         gp_stats = getattr(summary, "gameplay_stats", {}) or {}
         if gp_stats.get("aces", 0) > 0:
             raw_tags.extend([f"#{clean_game}Ace", "#AceClip", "#Ace"])
@@ -41,6 +42,18 @@ class HashtagEngine:
             raw_tags.extend(["#MultiKill", "#CleanKills"])
         if gp_stats.get("headshots", 0) > 0:
             raw_tags.extend(["#Headshot", "#OneTap"])
+        if gp_stats.get("jumpscares", 0) > 0 or "jumpscare" in ev:
+            raw_tags.extend(["#HorrorGaming", "#Jumpscare", "#ScaryMoments"])
+        if gp_stats.get("panic_escapes", 0) > 0 or "panic escape" in ev:
+            raw_tags.extend(["#CloseCall", "#EscapeMoment"])
+        if gp_stats.get("story_climaxes", 0) > 0 or "story" in ev:
+            raw_tags.extend(["#StoryMode", "#GamingStory", "#Cinematic"])
+        if gp_stats.get("comedic_moments", 0) > 0 or "comedy" in ev:
+            raw_tags.extend(["#FunnyGaming", "#GamingComedy", "#GamingFails"])
+        if gp_stats.get("chaos_bursts", 0) > 0:
+            raw_tags.extend(["#OpenWorld", "#GamingChaos", "#OnlyInGaming"])
+        if gp_stats.get("boss_fights", 0) > 0:
+            raw_tags.extend(["#BossFight", "#EpicGaming"])
 
         # 3. Candidate-Specific Event Tag
         ev = summary.primary_event.strip().lower()
@@ -66,7 +79,13 @@ class HashtagEngine:
             raw_tags.append("#ClutchMoments")
 
         # 5. Core Discovery Tags
-        raw_tags.extend(["#Gaming", "#GamingShorts", "#FPS"])
+        raw_tags.extend(["#Gaming", "#GamingShorts"])
+        if any(w in summary.game.lower() for w in ["valorant", "cs", "cod", "apex", "overwatch", "fortnite", "bgmi", "shooter", "fps"]):
+            raw_tags.append("#FPS")
+        elif "horror" in summary.tone or gp_stats.get("jumpscares", 0) > 0:
+            raw_tags.append("#Horror")
+        elif gp_stats.get("story_climaxes", 0) > 0 or gp_stats.get("chaos_bursts", 0) > 0:
+            raw_tags.append("#OpenWorld")
 
         # Deduplicate case-insensitively
         seen_lower: Set[str] = set()

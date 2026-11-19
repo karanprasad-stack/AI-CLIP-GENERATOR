@@ -399,6 +399,26 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
                 borderRadius: 8,
                 border: '1px solid var(--border-color)',
               }}>
+                {/* Game / Content Mode */}
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+                    Game Intelligence Mode
+                  </label>
+                  <select
+                    className="select"
+                    style={{ width: '100%' }}
+                    value={settings.game_mode || 'auto'}
+                    onChange={(e) => setSettings({ ...settings, game_mode: e.target.value as any })}
+                  >
+                    <option value="auto">Auto-Detect Game & Genre (Recommended)</option>
+                    <option value="story_open_world">Story & Open-World (GTA VI/V, RDR2, Cyberpunk, Elden Ring)</option>
+                    <option value="horror_survival">Horror & Survival (Resident Evil, Phasmophobia, Lethal Company)</option>
+                    <option value="valorant">Competitive FPS — Valorant (Kill-feed & Round CV)</option>
+                    <option value="competitive_fps">Competitive FPS — General (CS2, Apex, CoD, Fortnite)</option>
+                    <option value="generic">Generic / Variety Gaming</option>
+                  </select>
+                </div>
+
                 {/* Frame Aspect Ratio Selection */}
                 <div style={{ gridColumn: 'span 2' }}>
                   <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>

@@ -4,10 +4,20 @@ from typing import Dict, Type
 from .base import BaseGameProfile
 from .generic import GenericGameProfile
 from .valorant import ValorantGameProfile
+from .story_open_world import StoryOpenWorldProfile
+from .horror_survival import HorrorSurvivalProfile
+from .competitive_fps import CompetitiveFPSProfile
 
 REGISTERED_PROFILES: Dict[str, Type[BaseGameProfile]] = {
     "generic": GenericGameProfile,
     "valorant": ValorantGameProfile,
+    "story_open_world": StoryOpenWorldProfile,
+    "story": StoryOpenWorldProfile,
+    "open_world": StoryOpenWorldProfile,
+    "horror_survival": HorrorSurvivalProfile,
+    "horror": HorrorSurvivalProfile,
+    "competitive_fps": CompetitiveFPSProfile,
+    "fps": CompetitiveFPSProfile,
 }
 
 

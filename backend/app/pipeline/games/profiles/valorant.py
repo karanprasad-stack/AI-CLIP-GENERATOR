@@ -1,13 +1,21 @@
 """Valorant game profile with calibrated HUD regions, agent/weapon lexicons, and detection rules."""
 
 from typing import List, Dict, Any, Tuple
+from pydantic import Field
 from .base import BaseGameProfile
+from backend.app.config import GAME_AWARE_SCORING_WEIGHTS
 
 
 class ValorantGameProfile(BaseGameProfile):
     """Calibrated profile for Riot Games' Valorant (16:9 standard layout)."""
     name: str = "valorant"
     display_name: str = "Valorant"
+    archetype: str = "competitive_fps"
+    scoring_weights: Dict[str, float] = Field(default_factory=lambda: dict(GAME_AWARE_SCORING_WEIGHTS))
+    preferred_duration_tiers: List[str] = Field(default_factory=lambda: ["quick", "standard"])
+    effect_style: str = "fps_hype"
+    max_effects_per_minute: int = 12
+    default_hashtags: List[str] = Field(default_factory=lambda: ["#Valorant", "#ValorantClips", "#Shorts"])
     aliases: List[str] = [
         "valorant", "val", "vct", "radiant", "immortal",
         "riot valorant", "val clips", "valorant highlights"

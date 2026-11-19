@@ -114,7 +114,10 @@ class CandidateGenerator:
                 etype = getattr(ev, "event_type", "")
                 is_high_val = etype in {
                     "ace", "ace_candidate", "multi_kill", "rapid_kill_sequence",
-                    "clutch_candidate", "1vx_candidate", "round_win"
+                    "clutch_candidate", "1vx_candidate", "round_win",
+                    # Multi-genre high-value gameplay events
+                    "story_climax", "comedic_moment", "chaos_burst",
+                    "boss_fight_climax", "jumpscare", "panic_escape",
                 } or (etype == "kill" and (status == "confirmed" or conf >= 0.75))
 
                 if is_high_val and (status == "confirmed" or conf >= 0.70):
@@ -181,8 +184,13 @@ class CandidateGenerator:
             ev_len = ev_end - ev_start
 
             if ev_len <= self.max_duration:
-                combat_lead_ins = [4.0, 8.0, 12.0, 16.0]
-                combat_lead_outs = [4.0, 6.0, 10.0, 14.0]
+                etype = getattr(ev, "event_type", "")
+                if etype in {"story_climax", "comedic_moment", "boss_fight_climax"}:
+                    combat_lead_ins = [8.0, 16.0, 24.0, 32.0]
+                    combat_lead_outs = [4.0, 8.0, 14.0]
+                else:
+                    combat_lead_ins = [4.0, 8.0, 12.0, 16.0]
+                    combat_lead_outs = [4.0, 6.0, 10.0, 14.0]
                 for lead_in in combat_lead_ins:
                     for lead_out in combat_lead_outs:
                         target_start = max(0.0, ev_start - lead_in)

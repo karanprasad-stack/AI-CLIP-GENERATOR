@@ -28,7 +28,32 @@ GAME_AWARE_SCORING_WEIGHTS: Dict[str, float] = {
     "boundary": 0.10,
 }
 
-# Concrete Gameplay Event Bonuses (Phase 12B)
+# Multi-Genre Scoring Weights
+STORY_OPEN_WORLD_SCORING_WEIGHTS: Dict[str, float] = {
+    "audio": 0.16,
+    "transcript": 0.28,
+    "gameplay_event": 0.22,
+    "context": 0.24,
+    "boundary": 0.10,
+}
+
+HORROR_SURVIVAL_SCORING_WEIGHTS: Dict[str, float] = {
+    "audio": 0.30,
+    "transcript": 0.10,
+    "gameplay_event": 0.30,
+    "context": 0.20,
+    "boundary": 0.10,
+}
+
+COMPETITIVE_FPS_SCORING_WEIGHTS: Dict[str, float] = {
+    "audio": 0.20,
+    "transcript": 0.14,
+    "gameplay_event": 0.40,
+    "context": 0.16,
+    "boundary": 0.10,
+}
+
+# Concrete Gameplay Event Bonuses (Phase 12B / Multi-Genre)
 CONCRETE_GAMEPLAY_EVENT_BONUSES: Dict[str, float] = {
     "ace": 45.0,
     "ace_candidate": 34.0,
@@ -44,6 +69,13 @@ CONCRETE_GAMEPLAY_EVENT_BONUSES: Dict[str, float] = {
     "spectated_kill": 6.0,
     "kill": 3.5,
     "headshot": 5.0,
+    # Multi-Genre / Story / Horror Event Bonuses
+    "story_climax": 35.0,
+    "comedic_moment": 28.0,
+    "chaos_burst": 26.0,
+    "boss_fight_climax": 36.0,
+    "jumpscare": 40.0,
+    "panic_escape": 25.0,
 }
 
 # Sub-component weights for GameplayEventScore (Must sum to 1.0)

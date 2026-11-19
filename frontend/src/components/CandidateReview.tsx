@@ -426,6 +426,14 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
 
                     {/* Semantic Tags */}
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {c.detected_game_title && (
+                        <span className="badge badge-purple" style={{ fontWeight: 600 }}>{c.detected_game_title}</span>
+                      )}
+                      {c.game_archetype && c.game_archetype !== 'generic' && !c.detected_game_title && (
+                        <span className="badge" style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--text-dim)', fontSize: '0.72rem' }}>
+                          {c.game_archetype.replace('_', ' ')}
+                        </span>
+                      )}
                       {c.gameplay_event && (
                         <span className="badge badge-cyan">{c.gameplay_event}</span>
                       )}

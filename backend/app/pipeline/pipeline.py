@@ -307,12 +307,18 @@ def run_pipeline(
                     gameplay_timeline=gameplay_timeline,
                 )
                 ranked_results["game"] = game_profile.name
+                ranked_results["game_archetype"] = game_profile.archetype
+                ranked_results["detected_game_title"] = getattr(game_profile, "detected_title", None) or game_profile.display_name
                 ranked_results["gameplay_events_file"] = str(gameplay_events_file)
 
                 with open(candidates_file, "w", encoding="utf-8") as f:
                     json.dump(ranked_results, f, indent=2, ensure_ascii=False)
 
         # If only running up to Phase 2, return here
+        if "game_profile" not in locals() or game_profile is None:
+            game_detector = GameDetector()
+            game_profile = game_detector.detect_game(metadata=metadata, transcript_data=transcript_data, settings=settings)
+
         effective_duration = video_duration if video_duration > 0 else float(ranked_results.get("duration", 0.0))
         all_candidates = ranked_results.get("candidates", [])
 
@@ -451,6 +457,10 @@ def run_pipeline(
                     "gameplay_sequences": cand.get("gameplay_sequences", []),
                     "duration_tier": cand.get("duration_tier", get_duration_tier(cand_end - cand_start)),
                     "narrative_structure": cand.get("narrative_structure", get_narrative_structure(cand.get("duration_tier", "standard"))),
+                    "game_archetype": cand.get("game_archetype", getattr(game_profile, "archetype", "generic")),
+                    "effect_style": cand.get("effect_style", getattr(game_profile, "effect_style", "standard")),
+                    "max_effects_per_minute": cand.get("max_effects_per_minute", getattr(game_profile, "max_effects_per_minute", 10)),
+                    "detected_game_title": cand.get("detected_game_title", getattr(game_profile, "detected_title", None) or game_profile.display_name),
                 }
 
                 try:

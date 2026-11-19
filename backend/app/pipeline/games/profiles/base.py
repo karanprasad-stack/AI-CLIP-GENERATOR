@@ -1,13 +1,22 @@
 """Base game profile abstraction defining game-specific HUD coordinates, vocabulary, and rules."""
 
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 from pydantic import BaseModel, Field
+
+from backend.app.config import DEFAULT_SCORING_WEIGHTS
 
 
 class BaseGameProfile(BaseModel):
-    """Abstract profile defining UI geometry, callout vocabulary, and detection rules for a competitive game."""
+    """Abstract profile defining UI geometry, callout vocabulary, and detection rules for a game."""
     name: str = "generic"
     display_name: str = "Generic Game"
+    detected_title: Optional[str] = None
+    archetype: str = "generic"  # "competitive_fps" | "story_open_world" | "horror_survival" | "generic"
+    scoring_weights: Dict[str, float] = Field(default_factory=lambda: dict(DEFAULT_SCORING_WEIGHTS))
+    preferred_duration_tiers: List[str] = Field(default_factory=lambda: ["quick", "standard", "extended"])
+    effect_style: str = "balanced"  # "fps_hype" | "cinematic_comedy" | "horror_tension" | "balanced"
+    max_effects_per_minute: int = 10
+    default_hashtags: List[str] = Field(default_factory=list)
     aliases: List[str] = Field(default_factory=list)
     event_vocabulary: List[str] = Field(default_factory=list)
     reaction_vocabulary: List[str] = Field(default_factory=list)

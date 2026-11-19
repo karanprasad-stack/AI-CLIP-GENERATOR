@@ -32,6 +32,14 @@ class EventType(str, Enum):
     REACTION = "reaction"
     AUDIO_SPIKE = "audio_spike"
 
+    # Multi-Genre / Story / Horror / Open-World
+    STORY_CLIMAX = "story_climax"
+    COMEDIC_MOMENT = "comedic_moment"
+    CHAOS_BURST = "chaos_burst"
+    BOSS_FIGHT_CLIMAX = "boss_fight_climax"
+    JUMPSCARE = "jumpscare"
+    PANIC_ESCAPE = "panic_escape"
+
 
 class EventStatus(str, Enum):
     CONFIRMED = "confirmed"      # High-confidence cross-verified event (e.g. visual killfeed + audio/temporal)
@@ -63,6 +71,10 @@ class GameplayEvent(BaseModel):
     evidence_breakdown: Optional[EvidenceBreakdown] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
     explanation: str = ""
+
+    @property
+    def timestamp(self) -> float:
+        return (self.start_time + self.end_time) / 2.0
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize event to clean dictionary."""

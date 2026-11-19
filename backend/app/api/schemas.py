@@ -25,6 +25,7 @@ class ProcessingSettingsSchema(BaseModel):
     llm: bool = Field(default=False)
     quality_preset: str = Field(default="High", description="Standard, High, Very High, Custom")
     aspect_ratio: str = Field(default="9:16", description="9:16 or 1:1")
+    game_mode: str = Field(default="auto", description="auto, valorant, competitive_fps, story_open_world, horror_survival, generic")
     resolution: str = Field(default="1080x1920")
     fps: int = Field(default=60)
     target_lufs: float = Field(default=-14.0)

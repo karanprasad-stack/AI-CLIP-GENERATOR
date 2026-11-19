@@ -8,6 +8,9 @@ import numpy as np
 from backend.app.config import (
     DEFAULT_SCORING_WEIGHTS,
     GAME_AWARE_SCORING_WEIGHTS,
+    STORY_OPEN_WORLD_SCORING_WEIGHTS,
+    HORROR_SURVIVAL_SCORING_WEIGHTS,
+    COMPETITIVE_FPS_SCORING_WEIGHTS,
     CONCRETE_GAMEPLAY_EVENT_BONUSES,
     GAMEPLAY_INTERNAL_WEIGHTS,
     IOU_DEDUPLICATION_THRESHOLD,
@@ -89,6 +92,20 @@ class CandidateRanker:
         defuse_conf = 0.0
         plant_conf = 0.0
 
+        # Multi-genre event flags
+        has_jumpscare = False
+        jumpscare_conf = 0.0
+        has_boss_fight = False
+        boss_conf = 0.0
+        has_story_climax = False
+        story_conf = 0.0
+        has_comedy = False
+        comedy_conf = 0.0
+        has_chaos = False
+        chaos_conf = 0.0
+        has_panic = False
+        panic_conf = 0.0
+
         kill_events = []
         headshot_count = 0
         spectated_kills_count = 0
@@ -126,6 +143,26 @@ class CandidateRanker:
                 has_clutch = True
                 clutch_conf = max(clutch_conf, conf_factor)
 
+            # Multi-genre matches
+            if etype == "jumpscare":
+                has_jumpscare = True
+                jumpscare_conf = max(jumpscare_conf, conf_factor)
+            elif etype == "boss_fight_climax":
+                has_boss_fight = True
+                boss_conf = max(boss_conf, conf_factor)
+            elif etype == "story_climax":
+                has_story_climax = True
+                story_conf = max(story_conf, conf_factor)
+            elif etype == "comedic_moment":
+                has_comedy = True
+                comedy_conf = max(comedy_conf, conf_factor)
+            elif etype == "chaos_burst":
+                has_chaos = True
+                chaos_conf = max(chaos_conf, conf_factor)
+            elif etype == "panic_escape":
+                has_panic = True
+                panic_conf = max(panic_conf, conf_factor)
+
             if etype == "kill":
                 kill_events.append(ev)
                 if meta.get("headshot", False):
@@ -150,11 +187,47 @@ class CandidateRanker:
             spec_add = min(2.0, spectated_kills_count * 0.5)
             score = min(100.0, max(92.0, base + hs_add + spec_add))
             explanation = f"Ace sequence confirmed ({len(kill_events)} kills, conf {ace_conf:.2f})"
+        elif has_jumpscare:
+            base = 86.0 + min(10.0, jumpscare_conf * 10.0)
+            score = min(100.0, max(85.0, base))
+            explanation = f"Jumpscare climax confirmed (conf {jumpscare_conf:.2f})"
+        elif has_boss_fight:
+            base = 82.0 + min(10.0, boss_conf * 10.0)
+            score = min(96.0, max(80.0, base))
+            explanation = f"Boss fight climax confirmed (conf {boss_conf:.2f})"
+        elif has_story_climax:
+            base = 80.0 + min(10.0, story_conf * 10.0)
+            score = min(95.0, max(78.0, base))
+            explanation = f"Story narrative climax confirmed (conf {story_conf:.2f})"
         elif has_ace_cand:
             base = 82.0 + min(6.0, ace_cand_conf * 6.0)
             hs_add = min(4.0, headshot_count * 1.5)
             score = min(92.0, max(80.0, base + hs_add))
             explanation = f"Ace candidate sequence ({len(kill_events)} kills, conf {ace_cand_conf:.2f})"
+        elif has_4k:
+            base = 78.0 + min(6.0, four_k_conf * 6.0)
+            hs_add = min(4.0, headshot_count * 1.5)
+            clutch_add = 4.0 if has_clutch else 0.0
+            score = min(92.0, max(75.0, base + hs_add + clutch_add))
+            explanation = f"4K multi-kill confirmed (conf {four_k_conf:.2f})"
+        elif has_clutch:
+            base = 76.0 + min(6.0, clutch_conf * 6.0)
+            k_add = min(6.0, len(kill_events) * 2.0)
+            hs_add = min(4.0, headshot_count * 1.5)
+            score = min(92.0, max(75.0, base + k_add + hs_add))
+            explanation = f"Clutch candidate secured (conf {clutch_conf:.2f})"
+        elif has_comedy:
+            base = 74.0 + min(10.0, comedy_conf * 10.0)
+            score = min(90.0, max(72.0, base))
+            explanation = f"Comedic moment / fail confirmed (conf {comedy_conf:.2f})"
+        elif has_chaos:
+            base = 72.0 + min(10.0, chaos_conf * 10.0)
+            score = min(88.0, max(70.0, base))
+            explanation = f"Open-world chaos burst confirmed (conf {chaos_conf:.2f})"
+        elif has_panic:
+            base = 70.0 + min(8.0, panic_conf * 8.0)
+            score = min(85.0, max(68.0, base))
+            explanation = f"Panic escape sequence confirmed (conf {panic_conf:.2f})"
         elif has_4k:
             base = 78.0 + min(6.0, four_k_conf * 6.0)
             hs_add = min(4.0, headshot_count * 1.5)
@@ -208,6 +281,12 @@ class CandidateRanker:
             "has_3k": has_3k,
             "has_2k": has_2k,
             "has_clutch": has_clutch,
+            "has_jumpscare": has_jumpscare,
+            "has_boss_fight": has_boss_fight,
+            "has_story_climax": has_story_climax,
+            "has_comedy": has_comedy,
+            "has_chaos": has_chaos,
+            "has_panic": has_panic,
         }
 
         return round(score, 1), signals, explanation, metrics
@@ -252,11 +331,12 @@ class CandidateRanker:
                 "weight": s["weight"],
             })
         for p in audio_peaks:
+            z_val = float(p.get("z_score", p.get("z", round(p.get("intensity", 0.0) * 3.0, 2))))
             event_stream.append({
                 "t": p["timestamp"],
                 "cat": "audio_peak",
-                "term": f"Z={p['z_score']}",
-                "weight": min(3.0, p["z_score"]),
+                "term": f"Z={z_val:.2f}",
+                "weight": min(3.0, z_val),
             })
         event_stream.sort(key=lambda x: x["t"])
 
@@ -297,12 +377,15 @@ class CandidateRanker:
         # -------------------------------------------------------------
         # Component 3: audio_event_alignment (Weight: 20%)
         # -------------------------------------------------------------
-        audio_signals_repr = [f"audio_peak_z={p['z_score']}@{p['timestamp']:.2f}s" for p in audio_peaks]
+        audio_signals_repr = [
+            f"audio_peak_z={float(p.get('z_score', p.get('z', round(p.get('intensity', 0.0) * 3.0, 2)))):.2f}@{float(p.get('timestamp', 0.0)):.2f}s"
+            for p in audio_peaks
+        ]
         if not audio_peaks:
             audio_align_score = 0.0
             audio_align_expl = "No significant audio volume peaks detected."
         else:
-            max_z = max(p["z_score"] for p in audio_peaks)
+            max_z = max(float(p.get("z_score", p.get("z", round(p.get("intensity", 0.0) * 3.0, 2)))) for p in audio_peaks)
             # Check temporal alignment with speech / lexical tokens
             aligned_peaks = 0
             for p in audio_peaks:
@@ -670,6 +753,7 @@ class CandidateRanker:
         video_duration: float,
         top_k: int = 10,
         gameplay_timeline: Optional[Any] = None,
+        game_profile: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
         Scores candidate windows, computes granular signals, deduplicates, and ranks.
@@ -678,7 +762,7 @@ class CandidateRanker:
         """
         scored_candidates: List[Dict[str, Any]] = []
 
-        # Phase 12B: Detect if game-aware scoring weights should be used
+        # Phase 12B/Multi-Genre: Detect if game-aware scoring weights should be used
         has_concrete_timeline = False
         if gameplay_timeline and hasattr(gameplay_timeline, "events") and getattr(gameplay_timeline, "game", "generic") != "generic":
             non_supporting = [
@@ -689,8 +773,23 @@ class CandidateRanker:
             if non_supporting:
                 has_concrete_timeline = True
 
-        if not self.custom_weights and has_concrete_timeline:
-            active_weights = self._normalize_weights(GAME_AWARE_SCORING_WEIGHTS)
+        game_archetype = getattr(gameplay_timeline, "metadata", {}).get("game_archetype") or getattr(game_profile, "archetype", None)
+        effect_style = getattr(gameplay_timeline, "metadata", {}).get("effect_style") or getattr(game_profile, "effect_style", None)
+        max_effects_per_min = getattr(gameplay_timeline, "metadata", {}).get("max_effects_per_minute") or getattr(game_profile, "max_effects_per_minute", None)
+        detected_title = getattr(gameplay_timeline, "metadata", {}).get("detected_title") or getattr(game_profile, "detected_title", None) or getattr(game_profile, "display_name", None)
+
+        if not self.custom_weights and (has_concrete_timeline or game_archetype):
+            timeline_weights = getattr(gameplay_timeline, "metadata", {}).get("scoring_weights") or getattr(game_profile, "scoring_weights", None)
+            if timeline_weights:
+                active_weights = self._normalize_weights(timeline_weights)
+            elif game_archetype == "story_open_world":
+                active_weights = self._normalize_weights(STORY_OPEN_WORLD_SCORING_WEIGHTS)
+            elif game_archetype == "horror_survival":
+                active_weights = self._normalize_weights(HORROR_SURVIVAL_SCORING_WEIGHTS)
+            elif game_archetype == "competitive_fps" or getattr(gameplay_timeline, "game", "") == "valorant":
+                active_weights = self._normalize_weights(GAME_AWARE_SCORING_WEIGHTS)
+            else:
+                active_weights = self._normalize_weights(GAME_AWARE_SCORING_WEIGHTS)
         else:
             active_weights = self.weights
 
@@ -798,6 +897,10 @@ class CandidateRanker:
                 "gameplay_events": gp_events_list,
                 "gameplay_sequences": gp_seqs_list,
                 "gameplay_event_score": comp_scores.get("gameplay_event", 0.0),
+                "game_archetype": game_archetype or "generic",
+                "effect_style": effect_style or "balanced",
+                "max_effects_per_minute": max_effects_per_min or 10,
+                "detected_game_title": detected_title,
                 "signals": {
                     "audio_peaks": audio_metrics.get("peak_count", 0),
                     "reaction_phrases": trans_metrics.get("reaction_phrases", 0),

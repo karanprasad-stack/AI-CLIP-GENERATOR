@@ -66,7 +66,7 @@ class DescriptionEngine:
 
         hooks: List[str] = []
 
-        # 0. High-Priority Verified Gameplay Hooks (Phase 12C)
+        # 0. High-Priority Verified Gameplay Hooks (Phase 12C + Multi-Genre)
         gp_stats = getattr(summary, "gameplay_stats", {}) or {}
         aces = gp_stats.get("aces", 0)
         clutches = gp_stats.get("clutches", 0)
@@ -74,6 +74,30 @@ class DescriptionEngine:
         kills = gp_stats.get("kills", 0)
         headshots = gp_stats.get("headshots", 0)
         round_wins = gp_stats.get("round_wins", 0)
+        jumpscares = gp_stats.get("jumpscares", 0)
+        panic_escapes = gp_stats.get("panic_escapes", 0)
+        story_climaxes = gp_stats.get("story_climaxes", 0)
+        comedic_moments = gp_stats.get("comedic_moments", 0)
+        chaos_bursts = gp_stats.get("chaos_bursts", 0)
+        boss_fights = gp_stats.get("boss_fights", 0)
+
+        if jumpscares > 0 or "horror" in summary.tone.lower() or ev == "jumpscare":
+            hooks.append(f"Terrifying jumpscare in {game} caught everyone completely off guard!")
+            hooks.append(f"Heart-stopping moment in {game}—nobody was ready for what happened next.")
+        if boss_fights > 0 or ev == "boss fight":
+            hooks.append(f"Intense boss fight in {game} coming down to the final hit!")
+            hooks.append(f"Surviving against all odds in this brutal {game} boss encounter.")
+        if story_climaxes > 0 or ev == "story climax":
+            hooks.append(f"The story in {game} just took an insane turn...")
+            hooks.append(f"An unforgettable story climax in {game} that will leave you stunned.")
+        if comedic_moments > 0 or ev == "comedy":
+            hooks.append(f"When this happened in {game}, everyone completely lost it.")
+            hooks.append(f"One of the funniest, most unexpected moments to happen in {game}.")
+        if chaos_bursts > 0 or (ev == "chaos" and (story_climaxes > 0 or comedic_moments > 0)):
+            hooks.append(f"Pure open-world chaos in {game}—nothing went according to plan.")
+            hooks.append(f"Complete mayhem breaking loose in {game}!")
+        if panic_escapes > 0 or ev == "panic escape":
+            hooks.append(f"Running for dear life in {game}—the closest escape imaginable!")
 
         if aces > 0:
             hooks.append(f"An unbelievable ACE in {game}—taking down all 5 enemies to secure the round.")

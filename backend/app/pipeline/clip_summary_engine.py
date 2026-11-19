@@ -55,7 +55,18 @@ class ClipSummaryEngine:
         (r"\b(apex(\s+legends)?)\b", "Apex Legends", "Battle Royale"),
         (r"\b(fortnite)\b", "Fortnite", "Battle Royale"),
         (r"\b(warzone|call\s+of\s+duty|cod)\b", "Call of Duty", "FPS"),
-        (r"\b(gta\s*[v5]?|grand\s+theft\s+auto)\b", "GTA V", "Action"),
+        (r"\b(gta\s*vi|gta\s*6)\b", "GTA VI", "Open World"),
+        (r"\b(gta\s*[v5]?|grand\s+theft\s+auto)\b", "GTA V", "Open World"),
+        (r"\b(rdr2|rdr\s*2|red\s+dead)\b", "Red Dead Redemption 2", "Open World"),
+        (r"\b(cyberpunk(\s*2077)?)\b", "Cyberpunk 2077", "Open World RPG"),
+        (r"\b(elden\s+ring)\b", "Elden Ring", "Action RPG"),
+        (r"\b(god\s+of\s+war|gow)\b", "God of War", "Action"),
+        (r"\b(the\s+last\s+of\s+us|last\s+of\s+us|tlou)\b", "The Last of Us", "Action/Story"),
+        (r"\b(resident\s+evil|re4|re2|re7|re8)\b", "Resident Evil", "Horror"),
+        (r"\b(phasmophobia|phasmo)\b", "Phasmophobia", "Horror"),
+        (r"\b(outlast)\b", "Outlast", "Horror"),
+        (r"\b(lethal\s+company)\b", "Lethal Company", "Co-op Horror"),
+        (r"\b(silent\s+hill)\b", "Silent Hill", "Horror"),
         (r"\b(minecraft)\b", "Minecraft", "Sandbox"),
         (r"\b(league\s+of\s+legends|lol)\b", "League of Legends", "MOBA"),
         (r"\b(overwatch|ow2?)\b", "Overwatch", "Hero Shooter"),
@@ -88,7 +99,7 @@ class ClipSummaryEngine:
         cand_dur = float(candidate.get("candidate_duration", cand_end - cand_start))
 
         # 1. Game Identification
-        game = self.detect_game(video_metadata)
+        game = candidate.get("detected_game_title") or self.detect_game(video_metadata)
 
         # 2. Extract signals from gameplay event breakdown
         gameplay_bd = candidate.get("gameplay_event_breakdown", {})
@@ -138,7 +149,7 @@ class ClipSummaryEngine:
             primary_event = "gameplay highlight"
             secondary_events = []
 
-        # Parse concrete verified gameplay events (Phase 12A/12B/12C)
+        # Parse concrete verified gameplay events (Phase 12A/12B/12C + Multi-Genre)
         kills = 0
         headshots = 0
         aces = 0
@@ -146,6 +157,12 @@ class ClipSummaryEngine:
         multi_kills = 0
         round_wins = 0
         spike_events = 0
+        jumpscares = 0
+        panic_escapes = 0
+        story_climaxes = 0
+        comedic_moments = 0
+        chaos_bursts = 0
+        boss_fights = 0
         total_events = 0
 
         gameplay_events = candidate.get("gameplay_events", [])
@@ -174,6 +191,18 @@ class ClipSummaryEngine:
                 round_wins += 1
             elif ev_type in ("spike_planted", "spike_defused", "spike_denied"):
                 spike_events += 1
+            elif ev_type == "jumpscare":
+                jumpscares += 1
+            elif ev_type == "panic_escape":
+                panic_escapes += 1
+            elif ev_type == "story_climax":
+                story_climaxes += 1
+            elif ev_type == "comedic_moment":
+                comedic_moments += 1
+            elif ev_type == "chaos_burst":
+                chaos_bursts += 1
+            elif ev_type == "boss_fight_climax":
+                boss_fights += 1
 
         gameplay_stats = {
             "kills": kills,
@@ -183,26 +212,56 @@ class ClipSummaryEngine:
             "multi_kills": multi_kills,
             "round_wins": round_wins,
             "spike_events": spike_events,
+            "jumpscares": jumpscares,
+            "panic_escapes": panic_escapes,
+            "story_climaxes": story_climaxes,
+            "comedic_moments": comedic_moments,
+            "chaos_bursts": chaos_bursts,
+            "boss_fights": boss_fights,
             "total_events": total_events,
         }
 
         # Upgrade primary_event if high-value gameplay events exist
-        if aces > 0:
+        if jumpscares > 0:
+            primary_event = "jumpscare"
+        elif boss_fights > 0:
+            primary_event = "boss fight"
+        elif aces > 0:
             primary_event = "ace"
-            if "ace" not in secondary_events:
-                secondary_events.insert(0, "ace")
         elif clutches > 0:
             primary_event = "clutch"
-            if "clutch" not in secondary_events:
-                secondary_events.insert(0, "clutch")
+        elif story_climaxes > 0:
+            primary_event = "story climax"
+        elif comedic_moments > 0:
+            primary_event = "comedy"
+        elif chaos_bursts > 0:
+            primary_event = "chaos"
+        elif panic_escapes > 0:
+            primary_event = "panic escape"
         elif multi_kills > 0 or kills >= 3:
             primary_event = "multi-kill"
-            if "multi-kill" not in secondary_events:
-                secondary_events.insert(0, "multi-kill")
         elif headshots > 0 and primary_event in ("gameplay highlight", "reaction", "chaos"):
             primary_event = "headshot"
         elif kills > 0 and primary_event in ("gameplay highlight", "reaction", "chaos"):
             primary_event = "kill"
+
+        # Populate secondary events from active gameplay events
+        if jumpscares > 0 and "jumpscare" not in secondary_events:
+            secondary_events.append("jumpscare")
+        if boss_fights > 0 and "boss fight" not in secondary_events:
+            secondary_events.append("boss fight")
+        if aces > 0 and "ace" not in secondary_events:
+            secondary_events.append("ace")
+        if clutches > 0 and "clutch" not in secondary_events:
+            secondary_events.append("clutch")
+        if story_climaxes > 0 and "story climax" not in secondary_events:
+            secondary_events.append("story climax")
+        if comedic_moments > 0 and "comedy" not in secondary_events:
+            secondary_events.append("comedy")
+        if chaos_bursts > 0 and "chaos" not in secondary_events:
+            secondary_events.append("chaos")
+        if panic_escapes > 0 and "panic escape" not in secondary_events:
+            secondary_events.append("panic escape")
 
         duration_tier = candidate.get("duration_tier") or get_duration_tier(cand_dur)
 
