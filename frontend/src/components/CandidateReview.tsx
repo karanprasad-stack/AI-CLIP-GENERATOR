@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react'
-import { CheckSquare, Square, Flame, ArrowRight, Filter, SlidersHorizontal, ShieldCheck, AlertTriangle, XCircle, CheckCircle, Video, Play } from 'lucide-react'
+import { CheckSquare, Square, Flame, ArrowRight, Filter, SlidersHorizontal, ShieldCheck, AlertTriangle, XCircle, CheckCircle, Video, Play, FileText, Copy, Check } from 'lucide-react'
 import type { Candidate, ProjectDetail, CandidateSortOption, CandidateFilterOption } from '../types'
 import { getFileUrl } from '../api/client'
 import { ScoreBar } from './ui/ScoreBar'
@@ -46,6 +46,8 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
   const [filter, setFilter] = useState<CandidateFilterOption>('all')
   const [sort, setSort] = useState<CandidateSortOption>('score')
   const [isRenderConfirmOpen, setIsRenderConfirmOpen] = useState(false)
+  const [copiedDescId, setCopiedDescId] = useState<number | null>(null)
+  const [isDescExpanded, setIsDescExpanded] = useState(false)
 
   // Creator quality counts
   const publishCount = useMemo(() =>
@@ -626,6 +628,73 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
                     <div style={{ fontSize: '0.74rem', color: 'var(--text-dim)', background: 'rgba(255,255,255,0.04)', padding: '6px 12px', borderRadius: 4, maxWidth: 300 }}>
                       Select this candidate and click <strong>Render Selected Shorts</strong> below to produce the vertical video with subtitles, effects & SFX.
                     </div>
+                  </div>
+                )
+              })()}
+
+              {/* Auto-Generated Description & Tags (if candidate is already rendered/packaged) */}
+              {(() => {
+                const candId = activePreviewCandidate.candidate_id || activePreviewCandidate.rank
+                const matchingPkg = project.published_packages?.find((p) => p.candidate_id === candId)
+                if (!matchingPkg?.description) return null
+
+                return (
+                  <div style={{
+                    background: 'rgba(0,0,0,0.3)',
+                    padding: 12,
+                    borderRadius: 8,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                    border: '1px solid rgba(255,255,255,0.08)'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                        <FileText size={14} color="var(--accent-primary)" />
+                        Auto-Generated Description
+                      </div>
+                      <button
+                        className="btn btn-secondary"
+                        style={{ padding: '2px 8px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: 4 }}
+                        onClick={() => {
+                          if (matchingPkg.description) {
+                            navigator.clipboard.writeText(matchingPkg.description)
+                            setCopiedDescId(candId)
+                            setTimeout(() => setCopiedDescId(null), 2000)
+                          }
+                        }}
+                      >
+                        {copiedDescId === candId ? <Check size={12} color="var(--accent-green)" /> : <Copy size={12} />}
+                        {copiedDescId === candId ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
+                    <div style={{
+                      fontSize: '0.78rem',
+                      color: 'var(--text-dim)',
+                      whiteSpace: 'pre-wrap',
+                      maxHeight: isDescExpanded ? 'none' : 80,
+                      overflow: 'hidden',
+                      lineHeight: 1.4,
+                    }}>
+                      {matchingPkg.description}
+                    </div>
+                    {matchingPkg.description.length > 120 && (
+                      <button
+                        style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', fontSize: '0.72rem', cursor: 'pointer', textAlign: 'left', padding: 0 }}
+                        onClick={() => setIsDescExpanded(!isDescExpanded)}
+                      >
+                        {isDescExpanded ? 'Show less' : 'Show more...'}
+                      </button>
+                    )}
+                    {matchingPkg.hashtags && matchingPkg.hashtags.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
+                        {matchingPkg.hashtags.map((tag: string, idx: number) => (
+                          <span key={idx} style={{ fontSize: '0.7rem', background: 'rgba(99,102,241,0.15)', color: 'var(--accent-primary)', padding: '2px 6px', borderRadius: 4 }}>
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )
               })()}

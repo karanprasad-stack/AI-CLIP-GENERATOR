@@ -250,9 +250,56 @@ class ProjectManager:
                     m_data = json.load(mf)
                     pkgs = m_data.get("packages", [])
                     if pkgs:
+                        # Ensure each package in manifest has description, hashtags, and keywords
+                        for p in pkgs:
+                            cid = p.get("candidate_id")
+                            if cid and ("description" not in p or not p.get("description") or "hashtags" not in p or "keywords" not in p):
+                                c_meta_file = pub_dir / f"candidate_{cid:02d}" / "metadata.json"
+                                if c_meta_file.exists():
+                                    try:
+                                        with open(c_meta_file, "r", encoding="utf-8") as cmf:
+                                            cm_data = json.load(cmf)
+                                        if not p.get("description"):
+                                            p["description"] = cm_data.get("description", "")
+                                        if not p.get("hashtags"):
+                                            p["hashtags"] = cm_data.get("hashtags", [])
+                                        if not p.get("keywords"):
+                                            p["keywords"] = cm_data.get("keywords", [])
+                                    except Exception:
+                                        pass
+                                desc_txt_file = pub_dir / f"candidate_{cid:02d}" / "description.txt"
+                                if not p.get("description") and desc_txt_file.exists():
+                                    try:
+                                        p["description"] = desc_txt_file.read_text(encoding="utf-8").strip()
+                                    except Exception:
+                                        pass
                         proj["published_packages"] = pkgs
             except Exception:
                 pass
+
+        # Backfill any missing description/tags on existing published_packages
+        for p in proj.get("published_packages", []):
+            cid = p.get("candidate_id")
+            if cid and (not p.get("description") or "hashtags" not in p or "keywords" not in p):
+                c_meta_file = pub_dir / f"candidate_{cid:02d}" / "metadata.json"
+                if c_meta_file.exists():
+                    try:
+                        with open(c_meta_file, "r", encoding="utf-8") as cmf:
+                            cm_data = json.load(cmf)
+                        if not p.get("description"):
+                            p["description"] = cm_data.get("description", "")
+                        if not p.get("hashtags"):
+                            p["hashtags"] = cm_data.get("hashtags", [])
+                        if not p.get("keywords"):
+                            p["keywords"] = cm_data.get("keywords", [])
+                    except Exception:
+                        pass
+                desc_txt_file = pub_dir / f"candidate_{cid:02d}" / "description.txt"
+                if not p.get("description") and desc_txt_file.exists():
+                    try:
+                        p["description"] = desc_txt_file.read_text(encoding="utf-8").strip()
+                    except Exception:
+                        pass
 
         cands = proj.get("candidates", [])
         rendered_count = 0
@@ -289,6 +336,9 @@ class ProjectManager:
                         "candidate_id": cid,
                         "package_dir": str(cand_dir),
                         "title": cand_meta.get("title", {}).get("selected", cand.get("title", f"Short #{cid}")),
+                        "description": cand_meta.get("description", ""),
+                        "hashtags": cand_meta.get("hashtags", []),
+                        "keywords": cand_meta.get("keywords", []),
                         "thumbnail": str(thumb_jpg) if thumb_jpg.exists() else "",
                         "thumbnail_score": cand_meta.get("thumbnail", {}).get("score", 85.0),
                         "thumbnail_timestamp": cand.get("start", 0.0),
@@ -296,6 +346,13 @@ class ProjectManager:
                         "status": "PASS",
                         "publishability": cand_meta.get("publishability", cand.get("publishability")),
                     }
+                    if not new_pkg["description"]:
+                        desc_txt = cand_dir / "description.txt"
+                        if desc_txt.exists():
+                            try:
+                                new_pkg["description"] = desc_txt.read_text(encoding="utf-8").strip()
+                            except Exception:
+                                pass
                     proj.setdefault("published_packages", []).append(new_pkg)
                     pkgs_by_cid[cid] = new_pkg
             else:

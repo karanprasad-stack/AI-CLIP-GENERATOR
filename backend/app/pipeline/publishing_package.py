@@ -402,17 +402,20 @@ class PublishingPackageManager:
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "rights_note": DEFAULT_RIGHTS_NOTE,
             "total_packages": len(packages),
-            "packages_passed": sum(1 for p in packages if p["validation"]["status"] == "PASS"),
+            "packages_passed": sum(1 for p in packages if p.get("validation", {}).get("status") == "PASS" or p.get("status") in ("ready", "PASS")),
             "packages": [
                 {
-                    "candidate_id": p["candidate_id"],
-                    "package_dir": p["package_dir"],
-                    "title": p["title"],
-                    "thumbnail": p["thumbnail_path"],
-                    "thumbnail_score": p["thumbnail_score"],
-                    "thumbnail_timestamp": p["thumbnail_timestamp"],
+                    "candidate_id": p.get("candidate_id", 0),
+                    "package_dir": p.get("package_dir", ""),
+                    "title": p.get("title", ""),
+                    "description": p.get("description", ""),
+                    "hashtags": p.get("hashtags", []),
+                    "keywords": p.get("keywords", []),
+                    "thumbnail": p.get("thumbnail_path", p.get("thumbnail", "")),
+                    "thumbnail_score": p.get("thumbnail_score", 0.0),
+                    "thumbnail_timestamp": p.get("thumbnail_timestamp", 0.0),
                     "quality_score": p.get("metadata_quality", {}).get("overall", 0.9),
-                    "status": p["validation"]["status"],
+                    "status": p.get("validation", {}).get("status", p.get("status", "ready")),
                     "publishability": p.get("publishability"),
                 }
                 for p in packages

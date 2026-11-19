@@ -175,3 +175,44 @@ class ChunkStore:
                 cand["chunk_id"] = chunk_id
                 all_candidates.append(cand)
         return all_candidates
+
+    def get_merged_transcript(self, language: str = "en") -> Dict[str, Any]:
+        """
+        Merges transcripts from all completed chunks into a unified global transcript,
+        deduplicating boundary words and segments across chunk overlaps.
+        """
+        all_segments: List[Dict[str, Any]] = []
+        all_words: List[Dict[str, Any]] = []
+        seen_segments = set()
+        seen_words = set()
+
+        for chunk in self.get_completed_chunks():
+            t = chunk.get("transcript", {})
+            for seg in t.get("segments", []):
+                seg_key = (
+                    round(float(seg.get("start", 0.0)), 2),
+                    round(float(seg.get("end", 0.0)), 2),
+                    str(seg.get("text", "")).strip(),
+                )
+                if seg_key not in seen_segments:
+                    seen_segments.add(seg_key)
+                    all_segments.append(seg)
+
+            for w in t.get("words", []):
+                w_key = (
+                    round(float(w.get("start", 0.0)), 2),
+                    round(float(w.get("end", 0.0)), 2),
+                    str(w.get("word", "")).strip(),
+                )
+                if w_key not in seen_words:
+                    seen_words.add(w_key)
+                    all_words.append(w)
+
+        all_segments.sort(key=lambda s: float(s.get("start", 0.0)))
+        all_words.sort(key=lambda w: float(w.get("start", 0.0)))
+
+        return {
+            "language": language,
+            "segments": all_segments,
+            "words": all_words,
+        }

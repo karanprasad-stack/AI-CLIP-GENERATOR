@@ -39,6 +39,7 @@ class SubtitleValidator:
         expected_width: int = OUTPUT_WIDTH,
         expected_height: int = OUTPUT_HEIGHT,
         aspect_ratio: str = DEFAULT_ASPECT_RATIO,
+        allow_empty_dialogue: bool = False,
     ) -> Dict[str, Any]:
         """
         Validates the structure, syntax, and timing integrity of an ASS file.
@@ -157,11 +158,11 @@ class SubtitleValidator:
                         f"Timestamp {end_str} ({t_end:.2f}s) exceeds clip duration ({clip_duration:.2f}s + {duration_tolerance_sec}s)"
                     )
 
-        checks["has_dialogue_lines"] = dialogue_count > 0
+        checks["has_dialogue_lines"] = dialogue_count > 0 or allow_empty_dialogue
         if not checks["has_dialogue_lines"]:
             errors.append("No Dialogue lines found in ASS file")
 
-        checks["timestamps_valid"] = timestamps_valid and (dialogue_count > 0)
+        checks["timestamps_valid"] = timestamps_valid if dialogue_count > 0 else allow_empty_dialogue
         checks["no_negative_timestamps"] = no_negative
         checks["within_clip_duration"] = within_duration
 
@@ -185,6 +186,7 @@ class SubtitleValidator:
         expected_width: int = OUTPUT_WIDTH,
         expected_height: int = OUTPUT_HEIGHT,
         aspect_ratio: str = DEFAULT_ASPECT_RATIO,
+        allow_empty_dialogue: bool = False,
     ) -> Dict[str, Any]:
         """
         Validates both the ASS file and the burned-in captioned video MP4.
@@ -195,6 +197,7 @@ class SubtitleValidator:
             expected_width=expected_width,
             expected_height=expected_height,
             aspect_ratio=aspect_ratio,
+            allow_empty_dialogue=allow_empty_dialogue,
         )
         video_res = self.video_validator.validate_short(
             video_path,

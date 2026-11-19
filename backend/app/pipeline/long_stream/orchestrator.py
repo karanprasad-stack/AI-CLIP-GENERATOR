@@ -228,6 +228,11 @@ class LongStreamOrchestrator:
             "quality_gate_reason": explanation,
         }
 
+        merged_transcript = store.get_merged_transcript(
+            language=str(settings.get("subtitle_language", "en")).lower() if settings else "en"
+        )
+        merged_transcript["duration"] = round(source_duration, 2)
+
         emit_event("candidates_ready", {
             "stage": "Analysis Complete",
             "message": explanation,
@@ -242,4 +247,5 @@ class LongStreamOrchestrator:
             "candidates": diverse_pool,
             "selected_candidate_ids": [c["rank"] for c in recommended_shorts],
             "quality_gate_reason": explanation,
+            "transcript": merged_transcript,
         }

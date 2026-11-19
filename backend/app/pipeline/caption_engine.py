@@ -82,39 +82,46 @@ class CaptionEngine:
 
         effective_max = clip_duration if clip_duration is not None else (clip_end - clip_start)
 
+        source_words: List[Dict[str, Any]] = []
         for seg in segments:
-            seg_words = seg.get("words", [])
-            for w in seg_words:
-                w_start = float(w.get("start", 0.0))
-                w_end = float(w.get("end", 0.0))
-                w_text = str(w.get("word", "")).strip()
+            for w in seg.get("words", []):
+                source_words.append(w)
 
-                if not w_text:
-                    continue
+        # Fallback to top-level words if segments were empty
+        if not source_words and transcript_data.get("words"):
+            source_words = list(transcript_data.get("words", []))
 
-                # Check overlap with candidate window
-                if w_start < clip_end and w_end > clip_start:
-                    rel_start = max(0.0, w_start - clip_start)
-                    rel_end = w_end - clip_start
+        for w in source_words:
+            w_start = float(w.get("start", 0.0))
+            w_end = float(w.get("end", 0.0))
+            w_text = str(w.get("word", "")).strip()
 
-                    if effective_max > 0:
-                        rel_end = min(effective_max, rel_end)
+            if not w_text:
+                continue
 
-                    # Ensure valid monotonic duration
-                    if rel_end <= rel_start:
-                        rel_end = rel_start + 0.10
+            # Check overlap with candidate window
+            if w_start < clip_end and w_end > clip_start:
+                rel_start = max(0.0, w_start - clip_start)
+                rel_end = w_end - clip_start
 
-                    raw_words.append(
-                        CaptionWord(
-                            text=w_text,
-                            start=round(rel_start, 3),
-                            end=round(rel_end, 3),
-                            index=word_idx,
-                            global_start=round(w_start, 3),
-                            global_end=round(w_end, 3),
-                        )
+                if effective_max > 0:
+                    rel_end = min(effective_max, rel_end)
+
+                # Ensure valid monotonic duration
+                if rel_end <= rel_start:
+                    rel_end = rel_start + 0.10
+
+                raw_words.append(
+                    CaptionWord(
+                        text=w_text,
+                        start=round(rel_start, 3),
+                        end=round(rel_end, 3),
+                        index=word_idx,
+                        global_start=round(w_start, 3),
+                        global_end=round(w_end, 3),
                     )
-                    word_idx += 1
+                )
+                word_idx += 1
 
         return raw_words
 

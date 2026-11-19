@@ -254,7 +254,19 @@ class HinglishNormalizer:
         Processes entire transcript, adding normalized Hinglish segments while
         preserving all Whisper source timings and language metadata.
         """
-        segments = transcript_data.get("segments", [])
+        segments = list(transcript_data.get("segments", []))
+        if not segments and transcript_data.get("words"):
+            top_words = transcript_data.get("words", [])
+            w_text = " ".join(str(w.get("word", "")) for w in top_words)
+            w_start = float(top_words[0].get("start", 0.0)) if top_words else 0.0
+            w_end = float(top_words[-1].get("end", 0.0)) if top_words else 0.0
+            segments = [{
+                "start": w_start,
+                "end": w_end,
+                "text": w_text,
+                "words": top_words,
+            }]
+
         normalized_segments: List[Dict[str, Any]] = []
 
         total_substitutions = 0

@@ -189,6 +189,20 @@ def run_pipeline(
                     ranked_results = json.load(f)
                 with open(transcript_file, "r", encoding="utf-8") as f:
                     transcript_data = json.load(f)
+
+                # Auto-recover full words if transcript_file was saved with empty segments from legacy run
+                if is_long_stream(video_duration) and not transcript_data.get("segments") and not transcript_data.get("words"):
+                    chunks_dir = job_output_dir / "long_stream" / "chunks"
+                    if chunks_dir.exists():
+                        from backend.app.pipeline.long_stream.chunk_store import ChunkStore
+                        c_store = ChunkStore(job_output_dir)
+                        rec_t = c_store.get_merged_transcript(language=transcript_data.get("language", metadata.get("language", "en")))
+                        if rec_t.get("segments") or rec_t.get("words"):
+                            rec_t["duration"] = video_duration
+                            transcript_data = rec_t
+                            with open(transcript_file, "w", encoding="utf-8") as f:
+                                json.dump(transcript_data, f, indent=2, ensure_ascii=False)
+
                 report_progress(2, "Audio already available, skipping download...")
                 report_progress(3, "Transcript already available, skipping Whisper...")
                 report_progress(4, "Analysis cached, skipping re-analysis...")
@@ -238,10 +252,15 @@ def run_pipeline(
                 with open(candidates_file, "w", encoding="utf-8") as f:
                     json.dump(ranked_results, f, indent=2, ensure_ascii=False)
 
-                if not transcript_file.exists():
-                    with open(transcript_file, "w", encoding="utf-8") as f:
-                        json.dump({"language": metadata.get("language", "en"), "duration": video_duration, "segments": []}, f, indent=2)
-                transcript_data = {"language": metadata.get("language", "en"), "duration": video_duration, "segments": []}
+                transcript_data = orchestrator_res.get("transcript")
+                if not transcript_data or (not transcript_data.get("segments") and not transcript_data.get("words")):
+                    from backend.app.pipeline.long_stream.chunk_store import ChunkStore
+                    c_store = ChunkStore(job_output_dir)
+                    transcript_data = c_store.get_merged_transcript(language=metadata.get("language", "en"))
+                transcript_data["duration"] = video_duration
+
+                with open(transcript_file, "w", encoding="utf-8") as f:
+                    json.dump(transcript_data, f, indent=2, ensure_ascii=False)
 
             else:
                 transcriber = AudioTranscriber()
@@ -714,6 +733,7 @@ def run_pipeline(
                         expected_width=output_width,
                         expected_height=output_height,
                         aspect_ratio=aspect_ratio,
+                        allow_empty_dialogue=(len(caption_groups) == 0),
                     )
                     cand_p4["subtitle_validation"] = val_res
                     cand_p4["phase4_status"] = "PASS" if val_res["valid"] else "FAIL"

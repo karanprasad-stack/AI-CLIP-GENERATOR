@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Download, RefreshCw, Check, Film, Image as ImageIcon, FileText, ArrowLeft, Tag, Key, AlertTriangle, ShieldCheck, Sliders, Copy } from 'lucide-react'
 import type { ProjectDetail } from '../types'
-import { getFileUrl, getPackageDownloadUrl, updateMetadata, regenerateMetadata } from '../api/client'
+import { getFileUrl, getPackageDownloadUrl, updateMetadata, regenerateMetadata, getOutputDetail } from '../api/client'
 import { TimelineEditor } from './TimelineEditor/TimelineEditor'
 
 interface PublishingReviewProps {
@@ -40,8 +40,27 @@ export const PublishingReview: React.FC<PublishingReviewProps> = ({
       setHashtags(activePackage.hashtags || [])
       setKeywords(activePackage.keywords || [])
       setSaveSuccess(false)
+
+      // Fallback: if description or hashtags are missing from manifest, fetch directly from candidate output
+      if (!activePackage.description || !activePackage.hashtags || activePackage.hashtags.length === 0) {
+        getOutputDetail(project.id, activePackage.candidate_id)
+          .then((detail) => {
+            if (detail?.publishing?.description && !activePackage.description) {
+              setDescription(detail.publishing.description)
+            }
+            if (detail?.publishing?.hashtags && (!activePackage.hashtags || activePackage.hashtags.length === 0)) {
+              setHashtags(detail.publishing.hashtags)
+            }
+            if (detail?.publishing?.keywords && (!activePackage.keywords || activePackage.keywords.length === 0)) {
+              setKeywords(detail.publishing.keywords)
+            }
+          })
+          .catch(() => {
+            // ignore network/fallback errors
+          })
+      }
     }
-  }, [selectedIdx, activePackage])
+  }, [selectedIdx, activePackage, project.id])
 
   if (packages.length === 0) {
     return (

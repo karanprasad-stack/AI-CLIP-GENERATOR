@@ -126,6 +126,12 @@ export function getPackageDownloadUrl(id: string, candidateId?: number): string 
     : `${API_BASE}/projects/${id}/package`
 }
 
+export async function getOutputDetail(projectId: string, candidateId: number): Promise<any> {
+  const res = await fetch(`${API_BASE}/projects/${projectId}/outputs/${candidateId}`)
+  if (!res.ok) throw new Error('Failed to fetch output detail')
+  return res.json()
+}
+
 export function getFileUrl(id: string, relativePath: string): string {
   const cleanPath = relativePath.replace(/^.*[\\/]publishing[\\/]/, 'publishing/').replace(/^.*[\\/]output[\\/][^\\/]+[\\/]/, '')
   return `${API_BASE}/projects/${id}/files/${cleanPath.replace(/\\/g, '/')}`
