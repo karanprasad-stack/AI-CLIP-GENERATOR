@@ -1,0 +1,43 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# Dependency directories
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# Application storage & media outputs
+output/*
+!output/.gitkeep
+temp/*
+!temp/.gitkeep
+models/*
+!models/.gitkeep
+cache/
+
+# Testing & coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs
+*.log
+
+# Environment variables
+.env
+.env.local
+
+# Operating System & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
