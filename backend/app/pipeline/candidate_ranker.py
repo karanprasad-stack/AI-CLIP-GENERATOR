@@ -7,12 +7,15 @@ import numpy as np
 
 from backend.app.config import (
     DEFAULT_SCORING_WEIGHTS,
+    GAME_AWARE_SCORING_WEIGHTS,
+    CONCRETE_GAMEPLAY_EVENT_BONUSES,
     GAMEPLAY_INTERNAL_WEIGHTS,
     IOU_DEDUPLICATION_THRESHOLD,
     MAX_OVERLAP_SECONDS,
     EVENT_CLUSTER_WINDOW,
     HIGH_IMPACT_GAMING_WORDS,
 )
+from backend.app.pipeline.games.models import EventStatus
 from .audio_analyzer import AudioAnalyzer
 from .transcript_analyzer import TranscriptAnalyzer
 
@@ -21,6 +24,7 @@ class CandidateRanker:
     """Scores candidate moments using decoupled scoring modules, temporal clustering, and deduplication."""
 
     def __init__(self, weights: Dict[str, float] = None):
+        self.custom_weights = (weights is not None)
         self.raw_weights = weights or dict(DEFAULT_SCORING_WEIGHTS)
         self.weights = self._normalize_weights(self.raw_weights)
         self.internal_weights = dict(GAMEPLAY_INTERNAL_WEIGHTS)
@@ -34,12 +38,185 @@ class CandidateRanker:
             return dict(DEFAULT_SCORING_WEIGHTS)
         return {k: round(v / total, 4) for k, v in active.items()}
 
+    def calculate_concrete_gameplay_score(
+        self,
+        start_sec: float,
+        end_sec: float,
+        gameplay_timeline: Any,
+    ) -> Tuple[float, List[str], str, Dict[str, Any]]:
+        """
+        Evaluates concrete, verified Phase 12A gameplay combat and objective events in the window.
+        Returns:
+            concrete_score: float (0.0 to 100.0)
+            concrete_signals: list[str]
+            concrete_explanation: str
+            concrete_metrics: dict
+        """
+        if not gameplay_timeline or not hasattr(gameplay_timeline, "get_events_in_range"):
+            return 0.0, [], "No concrete gameplay events detected.", {}
+
+        w_events = gameplay_timeline.get_events_in_range(start_sec, end_sec)
+        if not w_events:
+            return 0.0, [], "No concrete gameplay events detected.", {}
+
+        # False-positive protection: Strictly filter out supporting-only events and pure exclamations
+        qualifying_events = [
+            e for e in w_events
+            if getattr(e, "status", "") != EventStatus.SUPPORTING.value
+            and getattr(e, "event_type", "") not in {"reaction", "audio_spike"}
+        ]
+
+        if not qualifying_events:
+            return 0.0, [], "No verified combat events in window (reactions only).", {}
+
+        has_ace = False
+        ace_conf = 0.0
+        has_ace_cand = False
+        ace_cand_conf = 0.0
+        has_4k = False
+        four_k_conf = 0.0
+        has_3k = False
+        three_k_conf = 0.0
+        has_2k = False
+        two_k_conf = 0.0
+        has_rapid = False
+        rapid_conf = 0.0
+        has_clutch = False
+        clutch_conf = 0.0
+        round_win = False
+        defuse_conf = 0.0
+        plant_conf = 0.0
+
+        kill_events = []
+        headshot_count = 0
+        spectated_kills_count = 0
+
+        for ev in qualifying_events:
+            etype = getattr(ev, "event_type", "")
+            meta = getattr(ev, "metadata", {}) or {}
+            subtype = meta.get("subtype", etype)
+            conf = getattr(ev, "confidence", 0.5)
+            status = getattr(ev, "status", "")
+
+            # Weight confidence factor
+            conf_factor = (0.7 + 0.3 * conf) if status == EventStatus.CONFIRMED.value else (0.5 + 0.3 * conf)
+
+            if etype == "ace" or subtype == "ace":
+                has_ace = True
+                ace_conf = max(ace_conf, conf_factor)
+            elif etype == "ace_candidate" or subtype == "ace_candidate":
+                has_ace_cand = True
+                ace_cand_conf = max(ace_cand_conf, conf_factor)
+            elif subtype == "4k":
+                has_4k = True
+                four_k_conf = max(four_k_conf, conf_factor)
+            elif subtype == "3k":
+                has_3k = True
+                three_k_conf = max(three_k_conf, conf_factor)
+            elif subtype == "2k":
+                has_2k = True
+                two_k_conf = max(two_k_conf, conf_factor)
+            elif etype == "rapid_kill_sequence":
+                has_rapid = True
+                rapid_conf = max(rapid_conf, conf_factor)
+
+            if etype in {"clutch_candidate", "1vx_candidate"}:
+                has_clutch = True
+                clutch_conf = max(clutch_conf, conf_factor)
+
+            if etype == "kill":
+                kill_events.append(ev)
+                if meta.get("headshot", False):
+                    headshot_count += 1
+                if meta.get("is_spectated_player", False) or meta.get("killer") == "spectated_player":
+                    spectated_kills_count += 1
+
+            if etype == "headshot":
+                headshot_count += 1
+
+            if etype == "round_win":
+                round_win = True
+            elif etype == "spike_defused":
+                defuse_conf = max(defuse_conf, conf_factor)
+            elif etype == "spike_planted":
+                plant_conf = max(plant_conf, conf_factor)
+
+        # Map to calibrated hierarchy score [0.0 - 100.0]
+        if has_ace:
+            base = 90.0 + min(6.0, ace_conf * 6.0)
+            hs_add = min(3.0, headshot_count * 1.5)
+            spec_add = min(2.0, spectated_kills_count * 0.5)
+            score = min(100.0, max(92.0, base + hs_add + spec_add))
+            explanation = f"Ace sequence confirmed ({len(kill_events)} kills, conf {ace_conf:.2f})"
+        elif has_ace_cand:
+            base = 82.0 + min(6.0, ace_cand_conf * 6.0)
+            hs_add = min(4.0, headshot_count * 1.5)
+            score = min(92.0, max(80.0, base + hs_add))
+            explanation = f"Ace candidate sequence ({len(kill_events)} kills, conf {ace_cand_conf:.2f})"
+        elif has_4k:
+            base = 78.0 + min(6.0, four_k_conf * 6.0)
+            hs_add = min(4.0, headshot_count * 1.5)
+            clutch_add = 4.0 if has_clutch else 0.0
+            score = min(92.0, max(75.0, base + hs_add + clutch_add))
+            explanation = f"4K multi-kill confirmed (conf {four_k_conf:.2f})"
+        elif has_clutch:
+            base = 76.0 + min(6.0, clutch_conf * 6.0)
+            k_add = min(6.0, len(kill_events) * 2.0)
+            hs_add = min(4.0, headshot_count * 1.5)
+            score = min(92.0, max(75.0, base + k_add + hs_add))
+            explanation = f"Clutch candidate secured (conf {clutch_conf:.2f})"
+        elif has_3k:
+            base = 62.0 + min(6.0, three_k_conf * 6.0)
+            hs_add = min(4.0, headshot_count * 1.5)
+            rw_add = 3.0 if round_win else 0.0
+            score = min(75.0, max(60.0, base + hs_add + rw_add))
+            explanation = f"3K multi-kill confirmed (conf {three_k_conf:.2f})"
+        elif has_rapid:
+            base = 56.0 + min(5.0, rapid_conf * 5.0)
+            score = min(72.0, max(55.0, base))
+            explanation = f"Rapid kill sequence confirmed (conf {rapid_conf:.2f})"
+        elif has_2k:
+            base = 42.0 + min(5.0, two_k_conf * 5.0)
+            hs_add = min(4.0, headshot_count * 2.0)
+            rw_add = 3.0 if round_win else 0.0
+            score = min(55.0, max(40.0, base + hs_add + rw_add))
+            explanation = f"2K multi-kill confirmed (conf {two_k_conf:.2f})"
+        elif len(kill_events) >= 1:
+            k_cnt = len(kill_events)
+            avg_k_conf = sum(getattr(k, "confidence", 0.5) for k in kill_events) / float(k_cnt)
+            base = 22.0 + min(5.0, avg_k_conf * 5.0)
+            hs_add = min(5.0, headshot_count * 2.5)
+            rw_add = 3.0 if round_win else 0.0
+            score = min(38.0, max(20.0, base + hs_add + rw_add))
+            explanation = f"{k_cnt} elimination(s) confirmed (conf {avg_k_conf:.2f})"
+        elif round_win or defuse_conf > 0 or plant_conf > 0:
+            base = 15.0 + (5.0 if round_win else 0.0) + (4.0 if defuse_conf > 0 else 0.0) + (3.0 if plant_conf > 0 else 0.0)
+            score = min(30.0, max(12.0, base))
+            explanation = "Objective gameplay event (round win/spike)"
+        else:
+            return 0.0, [], "No concrete gameplay events detected.", {}
+
+        signals = [f"event:{e.event_type}@{e.start_time:.1f}s" for e in qualifying_events]
+        metrics = {
+            "kills": len(kill_events),
+            "headshots": headshot_count,
+            "spectated_kills": spectated_kills_count,
+            "has_ace": has_ace,
+            "has_4k": has_4k,
+            "has_3k": has_3k,
+            "has_2k": has_2k,
+            "has_clutch": has_clutch,
+        }
+
+        return round(score, 1), signals, explanation, metrics
+
     def calculate_gameplay_event_score(
         self,
         start_sec: float,
         end_sec: float,
         audio_analysis: Dict[str, Any],
-        transcript_analyzer: TranscriptAnalyzer
+        transcript_analyzer: TranscriptAnalyzer,
+        gameplay_timeline: Optional[Any] = None,
     ) -> Tuple[float, Dict[str, Any], List[str], Dict[str, Any]]:
         """
         Evaluates temporal clustering of gaming terminology, vocal reactions, and audio peaks.
@@ -318,6 +495,29 @@ class CandidateRanker:
             "total_events": total_events_count,
         }
 
+        # Phase 12B: Concrete Gameplay Event Scoring Integration
+        if gameplay_timeline and hasattr(gameplay_timeline, "get_events_in_range"):
+            concrete_score, concrete_signals, concrete_expl, concrete_metrics = self.calculate_concrete_gameplay_score(
+                start_sec, end_sec, gameplay_timeline
+            )
+            if concrete_score > 0.0:
+                legacy_score = final_gameplay_score
+                combined = round(0.75 * concrete_score + 0.25 * legacy_score, 1)
+                final_gameplay_score = float(np.clip(combined, 0.0, 100.0))
+                if concrete_score >= 70.0:
+                    final_gameplay_score = max(final_gameplay_score, concrete_score)
+
+                breakdown["concrete_gameplay_events"] = {
+                    "score": round(concrete_score, 1),
+                    "signals": concrete_signals,
+                    "explanation": concrete_expl,
+                }
+                if concrete_expl and concrete_expl not in reasons:
+                    reasons.insert(0, concrete_expl)
+
+                metrics["concrete_score"] = concrete_score
+                metrics.update(concrete_metrics)
+
         return final_gameplay_score, metrics, reasons, breakdown
 
     def calculate_boundary_score(
@@ -469,6 +669,22 @@ class CandidateRanker:
         """
         scored_candidates: List[Dict[str, Any]] = []
 
+        # Phase 12B: Detect if game-aware scoring weights should be used
+        has_concrete_timeline = False
+        if gameplay_timeline and hasattr(gameplay_timeline, "events") and getattr(gameplay_timeline, "game", "generic") != "generic":
+            non_supporting = [
+                e for e in gameplay_timeline.events
+                if getattr(e, "status", "") != EventStatus.SUPPORTING.value
+                and getattr(e, "event_type", "") not in {"reaction", "audio_spike"}
+            ]
+            if non_supporting:
+                has_concrete_timeline = True
+
+        if not self.custom_weights and has_concrete_timeline:
+            active_weights = self._normalize_weights(GAME_AWARE_SCORING_WEIGHTS)
+        else:
+            active_weights = self.weights
+
         for start_sec, end_sec in candidates:
             dur = round(end_sec - start_sec, 2)
             if dur <= 0:
@@ -484,9 +700,9 @@ class CandidateRanker:
                 start_sec, end_sec
             )
 
-            # Module 3: Gameplay Event Score with granular breakdown
+            # Module 3: Gameplay Event Score with granular breakdown (integrates Phase 12B concrete game events)
             event_score, event_metrics, event_reasons, event_breakdown = self.calculate_gameplay_event_score(
-                start_sec, end_sec, audio_analysis, transcript_analyzer
+                start_sec, end_sec, audio_analysis, transcript_analyzer, gameplay_timeline=gameplay_timeline
             )
 
             # Module 4: Context Score
@@ -499,8 +715,8 @@ class CandidateRanker:
                 start_sec, end_sec, transcript_analyzer
             )
 
-            # Calculate composite score using normalized weights
-            w = self.weights
+            # Calculate composite score using normalized active weights
+            w = active_weights
             composite_score = (
                 (w.get("audio", 0.25) * audio_score)
                 + (w.get("transcript", 0.20) * trans_score)
@@ -561,7 +777,7 @@ class CandidateRanker:
                 "duration": dur,
                 "score": composite_score,
                 "final_score": composite_score,
-                "active_weights": self.weights,
+                "active_weights": active_weights,
                 "scores": comp_scores,
                 "component_scores": comp_scores,
                 "gameplay_event_breakdown": event_breakdown,
@@ -616,7 +832,8 @@ class CandidateRanker:
         return {
             "video_id": video_id,
             "duration": round(video_duration, 2),
-            "scoring_version": "phase2.1.1-v1",
-            "weights": self.weights,
+            "scoring_version": "phase12b-game-aware" if has_concrete_timeline else "phase2.1.1-v1",
+            "active_weights": active_weights,
+            "weights": active_weights,
             "candidates": deduplicated,
         }

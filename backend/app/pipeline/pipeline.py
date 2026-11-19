@@ -169,6 +169,7 @@ def run_pipeline(
         final_audio_path = job_output_dir / "audio.wav"
         transcript_file = job_output_dir / "transcript.json"
         candidates_file = job_output_dir / "candidates.json"
+        source_video_path = job_output_dir / "source.mp4"
 
         # Check if Phase 1 and 2 artifacts already exist
         ranked_results: Optional[Dict[str, Any]] = None
@@ -259,9 +260,16 @@ def run_pipeline(
                 transcript_analyzer = TranscriptAnalyzer(transcript_data)
                 effective_duration = video_duration if video_duration > 0 else audio_analysis.get("duration", 0.0)
 
-                # Phase 12A: Game Detection & Gameplay Event Timeline
+                # Phase 12A/12B: Game Detection & Gameplay Event Timeline
                 game_detector = GameDetector()
                 game_profile = game_detector.detect_game(metadata=metadata, transcript_data=transcript_data, settings=settings)
+
+                # Ensure Phase 12A visual detection gets source.mp4 on fresh runs
+                if phase_num >= 3 and game_profile.name != "generic" and not source_video_path.exists():
+                    report_progress(4, "Acquiring source video for visual gameplay event detection...")
+                    video_source_downloader = VideoSourceDownloader(temp_dir=job_temp_dir)
+                    video_source_downloader.download_source_video(url=url, output_file=source_video_path)
+
                 gameplay_engine = GameplayEngine(profile=game_profile)
                 gameplay_timeline = gameplay_engine.detect_events(
                     video_path=source_video_path if source_video_path.exists() else None,

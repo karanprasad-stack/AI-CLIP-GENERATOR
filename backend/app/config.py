@@ -19,6 +19,33 @@ DEFAULT_SCORING_WEIGHTS: Dict[str, float] = {
     "visual": 0.0,
 }
 
+# Phase 12B Game-Aware Scoring Weights (When concrete gameplay events are present)
+GAME_AWARE_SCORING_WEIGHTS: Dict[str, float] = {
+    "audio": 0.18,
+    "transcript": 0.12,
+    "gameplay_event": 0.45,
+    "context": 0.15,
+    "boundary": 0.10,
+}
+
+# Concrete Gameplay Event Bonuses (Phase 12B)
+CONCRETE_GAMEPLAY_EVENT_BONUSES: Dict[str, float] = {
+    "ace": 45.0,
+    "ace_candidate": 34.0,
+    "4k": 28.0,
+    "clutch_candidate": 25.0,
+    "3k": 20.0,
+    "rapid_kill_sequence": 18.0,
+    "2k": 12.0,
+    "round_win": 8.0,
+    "round_ending_kill": 8.0,
+    "spike_defused": 8.0,
+    "spike_planted": 6.0,
+    "spectated_kill": 6.0,
+    "kill": 3.5,
+    "headshot": 5.0,
+}
+
 # Sub-component weights for GameplayEventScore (Must sum to 1.0)
 GAMEPLAY_INTERNAL_WEIGHTS: Dict[str, float] = {
     "gaming_lexical": 0.25,
