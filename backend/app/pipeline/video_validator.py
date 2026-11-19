@@ -6,7 +6,13 @@ import subprocess
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-from backend.app.config import OUTPUT_WIDTH, OUTPUT_HEIGHT
+from backend.app.config import (
+    OUTPUT_WIDTH,
+    OUTPUT_HEIGHT,
+    DEFAULT_ASPECT_RATIO,
+    ASPECT_RATIO_1_1,
+    get_output_dimensions,
+)
 
 
 class VideoValidationError(Exception):
@@ -26,12 +32,15 @@ class VideoValidator:
         video_path: Path,
         expected_duration: Optional[float] = None,
         duration_tolerance_sec: float = 2.5,
+        expected_width: int = OUTPUT_WIDTH,
+        expected_height: int = OUTPUT_HEIGHT,
+        aspect_ratio: str = DEFAULT_ASPECT_RATIO,
     ) -> Dict[str, Any]:
         """
         Validates the MP4 file against all technical criteria:
         - file exists and size > 0
         - MP4 container
-        - video stream exists with 1080x1920 9:16 aspect ratio
+        - video stream exists with matching dimensions and aspect ratio
         - audio stream exists
         - duration matches expected duration within tolerance
         - FPS is valid (> 15)
@@ -50,6 +59,9 @@ class VideoValidator:
             "fps_valid": False,
             "decodable": False,
         }
+
+        if aspect_ratio == ASPECT_RATIO_1_1 and expected_width == OUTPUT_WIDTH and expected_height == OUTPUT_HEIGHT:
+            expected_width, expected_height = get_output_dimensions(aspect_ratio)
 
         # Check 1: File exists
         if not video_path.exists():
@@ -104,11 +116,11 @@ class VideoValidator:
             height = int(video_stream.get("height") or 0)
             vcodec = video_stream.get("codec_name", "unknown")
 
-            if width == OUTPUT_WIDTH and height == OUTPUT_HEIGHT:
+            if width == expected_width and height == expected_height:
                 checks["resolution_1080x1920"] = True
                 checks["aspect_ratio_9_16"] = True
             else:
-                errors.append(f"Resolution is {width}x{height}, expected {OUTPUT_WIDTH}x{OUTPUT_HEIGHT}")
+                errors.append(f"Resolution is {width}x{height}, expected {expected_width}x{expected_height}")
 
             # Calculate FPS
             rate_str = video_stream.get("avg_frame_rate") or video_stream.get("r_frame_rate") or "0/0"

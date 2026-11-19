@@ -10,10 +10,23 @@ interface NewProjectModalProps {
   isSubmitting: boolean
 }
 
-function isValidYouTubeUrl(input: string): boolean {
-  if (!input.trim()) return false
-  const ytRegex = /(?:v=|\/|youtu\.be\/)([0-9A-Za-z_-]{11})/
-  return ytRegex.test(input.trim())
+function isValidStreamUrl(input: string, sourceType: SourceType): boolean {
+  const trimmed = input.trim()
+  if (!trimmed) return false
+  if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) return false
+  if (sourceType === 'live_stream') {
+    // Live streams accept YouTube (watch, live, @channel), Twitch, Kick, or direct .m3u8
+    const lower = trimmed.toLowerCase()
+    return (
+      lower.includes('youtube.com') ||
+      lower.includes('youtu.be') ||
+      lower.includes('twitch.tv') ||
+      lower.includes('kick.com') ||
+      lower.includes('.m3u8')
+    )
+  }
+  const ytRegex = /(?:v=|\/|youtu\.be\/|shorts\/)([0-9A-Za-z_-]{11})/
+  return ytRegex.test(trimmed) || trimmed.includes('youtube.com') || trimmed.includes('youtu.be')
 }
 
 export const NewProjectModal: React.FC<NewProjectModalProps> = ({
@@ -32,7 +45,7 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
 
   if (!isOpen) return null
 
-  const isUrlValid = isValidYouTubeUrl(url)
+  const isUrlValid = isValidStreamUrl(url, sourceType)
 
   const handlePaste = async () => {
     try {
@@ -193,7 +206,7 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
               <input
                 type="text"
                 className="input-text"
-                placeholder={sourceType === 'live_stream' ? 'https://www.youtube.com/watch?v=... or live stream URL' : 'https://www.youtube.com/watch?v=EdtUDpqjltA or youtu.be/...'}
+                placeholder={sourceType === 'live_stream' ? 'https://youtube.com/live/... or twitch.tv/... or direct .m3u8' : 'https://www.youtube.com/watch?v=EdtUDpqjltA or youtu.be/...'}
                 value={url}
                 onChange={(e) => {
                   setUrl(e.target.value)
@@ -211,7 +224,9 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
 
             {urlTouched && !isUrlValid && url && (
               <div style={{ color: 'var(--accent-red)', fontSize: '0.8rem', marginTop: 6 }}>
-                Please provide a valid YouTube URL (e.g. https://www.youtube.com/watch?v=...)
+                {sourceType === 'live_stream'
+                  ? 'Please provide a valid live stream URL (YouTube /live/, Twitch, Kick, or direct .m3u8)'
+                  : 'Please provide a valid YouTube URL (e.g. https://www.youtube.com/watch?v=...)'}
               </div>
             )}
           </div>
@@ -384,10 +399,35 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
                 borderRadius: 8,
                 border: '1px solid var(--border-color)',
               }}>
+                {/* Frame Aspect Ratio Selection */}
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
+                    Render Frame Aspect Ratio
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <button
+                      type="button"
+                      className={`btn ${settings.aspect_ratio !== '1:1' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ justifyContent: 'center', fontSize: '0.85rem', padding: '8px 12px' }}
+                      onClick={() => setSettings({ ...settings, aspect_ratio: '9:16', resolution: '1080x1920' })}
+                    >
+                      9:16 Vertical (1080×1920)
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn ${settings.aspect_ratio === '1:1' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ justifyContent: 'center', fontSize: '0.85rem', padding: '8px 12px' }}
+                      onClick={() => setSettings({ ...settings, aspect_ratio: '1:1', resolution: '1080x1080' })}
+                    >
+                      1:1 Square (1080×1080)
+                    </button>
+                  </div>
+                </div>
+
                 {/* 9:16 Layout Strategy */}
                 <div style={{ gridColumn: 'span 2' }}>
                   <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
-                    9:16 Vertical Framing Strategy
+                    Framing / Cropping Strategy
                   </label>
                   <select
                     className="select"
@@ -470,7 +510,7 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               <span className="badge badge-cyan">{settings.min_duration}–{settings.max_duration}s</span>
               <span className="badge badge-purple">{settings.num_shorts_mode === 'auto' ? 'Auto Quota' : `${settings.num_shorts} Shorts`}</span>
-              <span className="badge badge-green">1080×1920 60FPS</span>
+              <span className="badge badge-green">{settings.aspect_ratio === '1:1' ? '1080×1080 60FPS (1:1)' : '1080×1920 60FPS (9:16)'}</span>
               <span className="badge badge-amber">{settings.subtitle_language.toUpperCase()}</span>
             </div>
           </div>

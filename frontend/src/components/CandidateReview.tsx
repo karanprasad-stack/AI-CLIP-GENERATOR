@@ -382,7 +382,7 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
                         )}
                         {isCandRendered && (
                           <span className="badge badge-green" style={{ fontSize: '0.72rem', padding: '2px 6px', display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <Video size={11} /> 9:16 RENDERED
+                            <Video size={11} /> {c.aspect_ratio === '1:1' || project.settings?.aspect_ratio === '1:1' ? '1:1 RENDERED' : '9:16 RENDERED'}
                           </span>
                         )}
                         <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>
@@ -539,7 +539,7 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-cyan)' }}>
                           <CheckCircle size={14} color="var(--accent-cyan)" />
-                          <span>Rendered 9:16 Vertical Video</span>
+                          <span>{activePreviewCandidate.aspect_ratio === '1:1' || project.settings?.aspect_ratio === '1:1' ? 'Rendered 1:1 Square Video' : 'Rendered 9:16 Vertical Video'}</span>
                         </div>
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
                           HTTP 206 Streaming
@@ -551,7 +551,15 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
                         preload="metadata"
                         key={renderedVideoUrl}
                         src={renderedVideoUrl}
-                        style={{ width: '100%', maxHeight: 380, display: 'block', margin: '0 auto', background: '#000' }}
+                        style={{
+                          width: '100%',
+                          maxHeight: 380,
+                          aspectRatio: activePreviewCandidate.aspect_ratio === '1:1' || project.settings?.aspect_ratio === '1:1' ? '1 / 1' : '9 / 16',
+                          display: 'block',
+                          margin: '0 auto',
+                          background: '#000',
+                          objectFit: 'contain',
+                        }}
                       >
                         Your browser does not support video preview.
                       </video>

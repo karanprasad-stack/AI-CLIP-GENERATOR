@@ -17,6 +17,11 @@ from backend.app.config import (
     EMOJI_FONT_NAME,
     EMOJI_FONT_SIZE,
     EMOJI_MARGIN_V,
+    OUTPUT_WIDTH,
+    OUTPUT_HEIGHT,
+    DEFAULT_ASPECT_RATIO,
+    ASPECT_RATIO_1_1,
+    get_output_dimensions,
 )
 from backend.app.pipeline.caption_engine import CaptionGroup
 
@@ -62,7 +67,29 @@ class AssGenerator:
         emoji_font_name: str = EMOJI_FONT_NAME,
         emoji_font_size: int = EMOJI_FONT_SIZE,
         emoji_margin_v: int = EMOJI_MARGIN_V,
+        output_width: int = OUTPUT_WIDTH,
+        output_height: int = OUTPUT_HEIGHT,
+        aspect_ratio: str = DEFAULT_ASPECT_RATIO,
     ):
+        self.aspect_ratio = aspect_ratio
+        if aspect_ratio == ASPECT_RATIO_1_1 and output_width == OUTPUT_WIDTH and output_height == OUTPUT_HEIGHT:
+            self.output_width, self.output_height = get_output_dimensions(aspect_ratio)
+        else:
+            self.output_width = output_width
+            self.output_height = output_height
+
+        # Scale vertical metrics if 1:1 square
+        if self.aspect_ratio == ASPECT_RATIO_1_1 or self.output_height == 1080:
+            scale_y = self.output_height / 1920.0
+            if margin_v == CAPTION_MARGIN_V:
+                margin_v = int(CAPTION_MARGIN_V * scale_y)
+            if emoji_margin_v == EMOJI_MARGIN_V:
+                emoji_margin_v = int(EMOJI_MARGIN_V * scale_y)
+            if font_size == CAPTION_FONT_SIZE:
+                font_size = 54
+            if emoji_font_size == EMOJI_FONT_SIZE:
+                emoji_font_size = 72
+
         self.font_name = font_name
         self.font_size = font_size
         self.base_color = base_color
@@ -78,15 +105,15 @@ class AssGenerator:
         self.emoji_margin_v = emoji_margin_v
 
     def build_header(self) -> str:
-        """Constructs [Script Info] and [V4+ Styles] headers targeting 1080x1920."""
+        """Constructs [Script Info] and [V4+ Styles] headers targeting output dimensions."""
         return f"""[Script Info]
 Title: AI Gaming Shorts Captions
 ScriptType: v4.00+
 WrapStyle: 0
 ScaledBorderAndShadow: yes
 YCbCr Matrix: TV.709
-PlayResX: 1080
-PlayResY: 1920
+PlayResX: {self.output_width}
+PlayResY: {self.output_height}
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding

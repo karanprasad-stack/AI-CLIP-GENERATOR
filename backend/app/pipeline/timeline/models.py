@@ -19,6 +19,7 @@ class TimelineVideoTrack(BaseModel):
     source_file: str = "source.mp4"
     layout: str = "smart_crop"  # smart_crop, blurred_background, facecam_gameplay
     resolution: str = "1080x1920"
+    aspect_ratio: str = "9:16"
     fps: int = 60
     enabled: bool = True
 

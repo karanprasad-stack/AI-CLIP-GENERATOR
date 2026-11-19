@@ -4,6 +4,13 @@ import re
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
+from backend.app.config import (
+    OUTPUT_WIDTH,
+    OUTPUT_HEIGHT,
+    DEFAULT_ASPECT_RATIO,
+    ASPECT_RATIO_1_1,
+    get_output_dimensions,
+)
 from backend.app.pipeline.video_validator import VideoValidator
 
 
@@ -29,6 +36,9 @@ class SubtitleValidator:
         ass_path: Path,
         clip_duration: Optional[float] = None,
         duration_tolerance_sec: float = 1.5,
+        expected_width: int = OUTPUT_WIDTH,
+        expected_height: int = OUTPUT_HEIGHT,
+        aspect_ratio: str = DEFAULT_ASPECT_RATIO,
     ) -> Dict[str, Any]:
         """
         Validates the structure, syntax, and timing integrity of an ASS file.
@@ -46,6 +56,9 @@ class SubtitleValidator:
             "no_negative_timestamps": False,
             "within_clip_duration": False,
         }
+
+        if aspect_ratio == ASPECT_RATIO_1_1 and expected_width == OUTPUT_WIDTH and expected_height == OUTPUT_HEIGHT:
+            expected_width, expected_height = get_output_dimensions(aspect_ratio)
 
         if not ass_path.exists():
             errors.append(f"ASS file does not exist: {ass_path}")
@@ -83,11 +96,12 @@ class SubtitleValidator:
             errors.append("Missing [Events] section")
 
         # Resolution check
-        has_resx = "PlayResX: 1080" in content
-        has_resy = "PlayResY: 1920" in content
+        has_resx = f"PlayResX: {expected_width}" in content
+        has_resy = f"PlayResY: {expected_height}" in content
         checks["target_resolution_1080x1920"] = has_resx and has_resy
-        if not checks["target_resolution_1080x1920"]:
-            errors.append(f"Target resolution mismatch (PlayResX:1080={has_resx}, PlayResY:1920={has_resy})")
+        checks["target_resolution_valid"] = has_resx and has_resy
+        if not (has_resx and has_resy):
+            errors.append(f"Target resolution mismatch (PlayResX:{expected_width}={has_resx}, PlayResY:{expected_height}={has_resy})")
 
         # Parse Dialogue lines
         dialogue_count = 0
@@ -168,12 +182,27 @@ class SubtitleValidator:
         video_path: Path,
         ass_path: Path,
         expected_duration: Optional[float] = None,
+        expected_width: int = OUTPUT_WIDTH,
+        expected_height: int = OUTPUT_HEIGHT,
+        aspect_ratio: str = DEFAULT_ASPECT_RATIO,
     ) -> Dict[str, Any]:
         """
         Validates both the ASS file and the burned-in captioned video MP4.
         """
-        ass_res = self.validate_ass(ass_path, clip_duration=expected_duration)
-        video_res = self.video_validator.validate_short(video_path, expected_duration=expected_duration)
+        ass_res = self.validate_ass(
+            ass_path,
+            clip_duration=expected_duration,
+            expected_width=expected_width,
+            expected_height=expected_height,
+            aspect_ratio=aspect_ratio,
+        )
+        video_res = self.video_validator.validate_short(
+            video_path,
+            expected_duration=expected_duration,
+            expected_width=expected_width,
+            expected_height=expected_height,
+            aspect_ratio=aspect_ratio,
+        )
 
         all_errors = list(ass_res.get("errors", [])) + list(video_res.get("errors", []))
         video_passed = (video_res.get("status") == "PASS") or bool(video_res.get("valid", False))

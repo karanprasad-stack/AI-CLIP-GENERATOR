@@ -24,6 +24,7 @@ class ProcessingSettingsSchema(BaseModel):
     metadata_enabled: bool = Field(default=True)
     llm: bool = Field(default=False)
     quality_preset: str = Field(default="High", description="Standard, High, Very High, Custom")
+    aspect_ratio: str = Field(default="9:16", description="9:16 or 1:1")
     resolution: str = Field(default="1080x1920")
     fps: int = Field(default=60)
     target_lufs: float = Field(default=-14.0)

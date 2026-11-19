@@ -9,6 +9,9 @@ from typing import Dict, Any, List, Optional
 from backend.app.config import (
     OUTPUT_WIDTH,
     OUTPUT_HEIGHT,
+    DEFAULT_ASPECT_RATIO,
+    ASPECT_RATIO_1_1,
+    get_output_dimensions,
     LAYOUT_AUTO,
 )
 from backend.app.pipeline.clip_extractor import ClipExtractor
@@ -122,6 +125,9 @@ class TimelineRenderer:
         effects_changed = subtitles_changed or "effects" in dirty or not effects_clip_path.exists()
         audio_changed = effects_changed or "sfx" in dirty or "ducking" in dirty or not audio_polished_clip.exists()
 
+        cand_aspect = getattr(timeline.video_track, "aspect_ratio", "9:16") or "9:16"
+        out_w, out_h = get_output_dimensions(cand_aspect)
+
         # Step 1: Boundaries & Vertical 9:16 Cropping
         if boundaries_changed:
             is_cand_clip = (source_video == cand_source)
@@ -142,6 +148,7 @@ class TimelineRenderer:
                 input_clip_path=extracted_clip_path,
                 output_short_path=vertical_clip_path,
                 layout=timeline.video_track.layout or "smart_crop",
+                aspect_ratio=cand_aspect,
             )
 
         # Step 2: Subtitles & Emojis ASS Burning
@@ -180,7 +187,12 @@ class TimelineRenderer:
                 if emo.enabled
             ]
 
-            self.ass_generator.write_ass_file(
+            ass_gen = AssGenerator(
+                output_width=out_w,
+                output_height=out_h,
+                aspect_ratio=cand_aspect,
+            )
+            ass_gen.write_ass_file(
                 output_path=ass_path,
                 caption_groups=caption_groups,
                 emoji_events=emoji_events,
@@ -218,6 +230,9 @@ class TimelineRenderer:
                 timeline=effect_timeline,
                 output_video_path=effects_clip_path,
                 facecam_info={"facecam_detected": False},
+                output_width=out_w,
+                output_height=out_h,
+                aspect_ratio=cand_aspect,
             )
 
         # Step 4: SFX Mixing & Speech-Aware Ducking
@@ -268,7 +283,12 @@ class TimelineRenderer:
         if not audio_polished_clip.exists() or audio_polished_clip.stat().st_size < 1000:
             raise TimelineRenderError(f"Rendered video is missing or empty: {audio_polished_clip}")
 
-        val_vid = self.video_validator.validate_short(audio_polished_clip)
+        val_vid = self.video_validator.validate_short(
+            audio_polished_clip,
+            expected_width=out_w,
+            expected_height=out_h,
+            aspect_ratio=cand_aspect,
+        )
         if not val_vid.get("valid", False) and val_vid.get("status") != "PASS":
             raise TimelineRenderError(f"Rendered video failed technical validation: {val_vid.get('errors')}")
 

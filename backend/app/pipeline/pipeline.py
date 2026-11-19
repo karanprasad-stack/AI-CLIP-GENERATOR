@@ -48,6 +48,9 @@ from backend.app.config import (
     POST_ROLL_SECONDS,
     OUTPUT_WIDTH,
     OUTPUT_HEIGHT,
+    DEFAULT_ASPECT_RATIO,
+    ASPECT_RATIO_1_1,
+    get_output_dimensions,
     LAYOUT_AUTO,
     CAPTION_FONT_NAME,
     CAPTION_FONT_SIZE,
@@ -94,17 +97,20 @@ def run_pipeline(
     settings: Optional[Dict[str, Any]] = None,
     long_stream_event_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     cancel_event: Optional[Any] = None,
+    aspect_ratio: str = DEFAULT_ASPECT_RATIO,
 ) -> Dict[str, Any]:
     """
     Executes the pipeline up to the specified phase (1, 2, 3, 4, 5, 6A, or 6B).
     phase=1: Audio download + Whisper transcription
     phase=2: Candidate generation + gaming event ranking
-    phase=3: Source video acquisition, lossless clipping & 9:16 vertical Shorts rendering
-    phase=4: Word-level subtitles, karaoke captions & contextual emojis burned on 9:16 Shorts
+    phase=3: Source video acquisition, lossless clipping & Short rendering (9:16 or 1:1)
+    phase=4: Word-level subtitles, karaoke captions & contextual emojis burned on Short
     phase=5: Context-aware visual effects (zoom, shake, flash) rendered onto edited Shorts
     phase=6 / 6a: Audio Polish & SFX Engine (whoosh, impacts, speech-aware ducking & loudnorm)
     phase=6b: Metadata, Thumbnail & Publishing Package Engine
     """
+    aspect_ratio = (settings.get("aspect_ratio") if settings else None) or aspect_ratio or DEFAULT_ASPECT_RATIO
+    output_width, output_height = get_output_dimensions(aspect_ratio)
     # Normalize phase input
     phase_str = str(phase).strip().lower()
     if phase_str in ["6b", "6B"]:
@@ -368,19 +374,23 @@ def run_pipeline(
             try:
                 with open(phase3_metadata_file, "r", encoding="utf-8") as f:
                     p3_cached_data = json.load(f)
-                cached_list = p3_cached_data.get("candidates", [])
-                if len(cached_list) >= min(top_n, len(selected_candidates)):
-                    all_exist = all(Path(c.get("short_clip", "")).exists() for c in cached_list[:top_n])
-                    if all_exist:
-                        processed_candidates = cached_list[:top_n]
-                        resolved_layout = p3_cached_data.get("layout_strategy", layout)
-                        facecam_info = p3_cached_data.get("facecam_info", facecam_info)
-                        source_fps = float(p3_cached_data.get("fps", 30.0))
-                        source_duration = float(p3_cached_data.get("source_duration", effective_duration))
-                        p3_cached = True
-                        report_progress(6, "Source video already cached...")
-                        report_progress(7, "Layout analysis cached...")
-                        report_progress(8, f"Phase 3 vertical clips loaded from cache ({len(processed_candidates)} clips)...")
+                cached_aspect = p3_cached_data.get("aspect_ratio", "9:16")
+                if cached_aspect != aspect_ratio:
+                    p3_cached = False
+                else:
+                    cached_list = p3_cached_data.get("candidates", [])
+                    if len(cached_list) >= min(top_n, len(selected_candidates)):
+                        all_exist = all(Path(c.get("short_clip", "")).exists() for c in cached_list[:top_n])
+                        if all_exist:
+                            processed_candidates = cached_list[:top_n]
+                            resolved_layout = p3_cached_data.get("layout_strategy", layout)
+                            facecam_info = p3_cached_data.get("facecam_info", facecam_info)
+                            source_fps = float(p3_cached_data.get("fps", 30.0))
+                            source_duration = float(p3_cached_data.get("source_duration", effective_duration))
+                            p3_cached = True
+                            report_progress(6, "Source video already cached...")
+                            report_progress(7, "Layout analysis cached...")
+                            report_progress(8, f"Phase 3 vertical clips loaded from cache ({len(processed_candidates)} clips)...")
             except Exception:
                 p3_cached = False
 
@@ -434,6 +444,7 @@ def run_pipeline(
                     "source_clip": str(source_clip_file),
                     "short_clip": str(short_clip_file),
                     "layout": resolved_layout,
+                    "aspect_ratio": aspect_ratio,
                 }
 
                 try:
@@ -451,13 +462,14 @@ def run_pipeline(
                     cand_record["extraction_end"] = ext_info["extraction_end"]
                     cand_record["extraction_duration"] = ext_info["extraction_duration"]
 
-                    # 8b: Render vertical 9:16 Short
+                    # 8b: Render Short (9:16 or 1:1)
                     render_info = renderer.render_short(
                         input_clip_path=source_clip_file,
                         output_short_path=short_clip_file,
                         layout=resolved_layout,
                         facecam_region=facecam_info.get("region"),
                         source_fps=source_fps,
+                        aspect_ratio=aspect_ratio,
                     )
                     cand_record["rendering_time_sec"] = render_info["rendering_time_sec"]
                     cand_record["encoder"] = render_info["encoder"]
@@ -466,6 +478,9 @@ def run_pipeline(
                     val_result = validator.validate_short(
                         video_path=short_clip_file,
                         expected_duration=ext_info["extraction_duration"],
+                        expected_width=output_width,
+                        expected_height=output_height,
+                        aspect_ratio=aspect_ratio,
                     )
                     cand_record["validation"] = val_result
                     cand_record["status"] = val_result["status"]
@@ -492,11 +507,12 @@ def run_pipeline(
                 "source_duration": round(source_duration, 2),
                 "generated_at": datetime.now(timezone.utc).isoformat(),
                 "layout_strategy": resolved_layout,
+                "aspect_ratio": aspect_ratio,
                 "facecam_detected": facecam_info.get("facecam_detected", False),
                 "facecam_info": facecam_info,
                 "output_resolution": {
-                    "width": OUTPUT_WIDTH,
-                    "height": OUTPUT_HEIGHT,
+                    "width": output_width,
+                    "height": output_height,
                 },
                 "fps": source_fps,
                 "encoder": "h264_nvenc" if renderer.nvenc_available else "libx264",
@@ -579,7 +595,11 @@ def run_pipeline(
             effective_transcript_data = normalizer.normalize_transcript(transcript_data)
 
             caption_engine = CaptionEngine()
-            ass_generator = AssGenerator()
+            ass_generator = AssGenerator(
+                output_width=output_width,
+                output_height=output_height,
+                aspect_ratio=aspect_ratio,
+            )
             emoji_engine = EmojiEngine()
             caption_renderer = CaptionRenderer()
             subtitle_validator = SubtitleValidator(video_validator=VideoValidator())
@@ -657,6 +677,7 @@ def run_pipeline(
                     "subtitle_mode": subtitle_mode,
                     "language": cand_contract["language"],
                     "normalized_transcript_file": str(cand_trans_path),
+                    "aspect_ratio": aspect_ratio,
                 })
 
                 try:
@@ -673,6 +694,9 @@ def run_pipeline(
                         video_path=captioned_clip_path,
                         ass_path=ass_file_path,
                         expected_duration=ext_duration,
+                        expected_width=output_width,
+                        expected_height=output_height,
+                        aspect_ratio=aspect_ratio,
                     )
                     cand_p4["subtitle_validation"] = val_res
                     cand_p4["phase4_status"] = "PASS" if val_res["valid"] else "FAIL"
@@ -825,6 +849,7 @@ def run_pipeline(
                         for eff in timeline.effects
                     },
                     "timeline_data": timeline.to_dict(),
+                    "aspect_ratio": aspect_ratio,
                 })
 
                 # 3. Render final video with visual effects
@@ -835,6 +860,9 @@ def run_pipeline(
                         output_video_path=final_video_path,
                         source_fps=source_fps,
                         facecam_info=facecam_info,
+                        output_width=output_width,
+                        output_height=output_height,
+                        aspect_ratio=aspect_ratio,
                     )
                     cand_p5["effect_render_time_sec"] = render_res["render_time_sec"]
                     cand_p5["effect_encoder"] = render_res["encoder"]
@@ -844,6 +872,7 @@ def run_pipeline(
                         video_path=final_video_path,
                         timeline_data=timeline,
                         expected_duration=ext_duration,
+                        aspect_ratio=aspect_ratio,
                     )
                     cand_p5["effect_validation"] = val_res
                     cand_p5["phase5_status"] = "PASS" if val_res["valid"] else "FAIL"
@@ -1005,6 +1034,7 @@ def run_pipeline(
                     },
                     "ducking_intervals_count": ducking_summary.get("speech_intervals_count", 0),
                     "ducking_summary": ducking_summary,
+                    "aspect_ratio": aspect_ratio,
                 })
 
                 # 4. Render final polished audio mix

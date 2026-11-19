@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
-from backend.app.config import ALL_EFFECT_TYPES
+from backend.app.config import ALL_EFFECT_TYPES, DEFAULT_ASPECT_RATIO
 from backend.app.pipeline.video_validator import VideoValidator
 from backend.app.pipeline.effect_engine import EffectTimeline
 
@@ -148,12 +148,17 @@ class EffectValidator:
         video_path: Path,
         timeline_data: Any,
         expected_duration: Optional[float] = None,
+        aspect_ratio: str = DEFAULT_ASPECT_RATIO,
     ) -> Dict[str, Any]:
         """
         Validates both the timeline structure and the resulting edited MP4 video.
         """
         timeline_res = self.validate_timeline(timeline_data, candidate_duration=expected_duration)
-        video_res = self.video_validator.validate_short(video_path, expected_duration=expected_duration)
+        video_res = self.video_validator.validate_short(
+            video_path,
+            expected_duration=expected_duration,
+            aspect_ratio=aspect_ratio,
+        )
 
         all_errors = list(timeline_res.get("errors", [])) + list(video_res.get("errors", []))
         video_passed = (video_res.get("status") == "PASS") or bool(video_res.get("valid", False))

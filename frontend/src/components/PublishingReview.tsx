@@ -131,6 +131,7 @@ export const PublishingReview: React.FC<PublishingReviewProps> = ({
   const thumbUrl = getFileUrl(project.id, `publishing/candidate_${activePackage.candidate_id.toString().padStart(2, '0')}/thumbnail.jpg`)
 
   const mq = activePackage.metadata_quality
+  const isSquare = (activePackage as any)?.aspect_ratio === '1:1' || project.settings?.aspect_ratio === '1:1'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -139,7 +140,7 @@ export const PublishingReview: React.FC<PublishingReviewProps> = ({
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
             <span className="badge badge-green">PUBLISHING READY</span>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>• 1080×1920 (9:16) @ 60fps</span>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>• {isSquare ? '1080×1080 (1:1)' : '1080×1920 (9:16)'} @ 60fps</span>
           </div>
           <h1 style={{ fontSize: '1.75rem', fontWeight: 800, letterSpacing: '-0.02em' }}>
             Publishing Packages & Metadata Editor
@@ -218,7 +219,7 @@ export const PublishingReview: React.FC<PublishingReviewProps> = ({
               borderRadius: 8,
               overflow: 'hidden',
               background: '#000',
-              aspectRatio: '9 / 16',
+              aspectRatio: isSquare ? '1 / 1' : '9 / 16',
               maxHeight: 520,
               display: 'flex',
               alignItems: 'center',

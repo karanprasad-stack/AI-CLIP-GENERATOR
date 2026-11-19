@@ -106,6 +106,31 @@ class VideoDownloader:
 
         return clean_url
 
+    def validate_live_url(self, url: str) -> str:
+        """
+        Validate that the provided live stream URL is not empty and is a valid live stream endpoint.
+        Supports YouTube (/live/, @channel/live), Twitch, Kick, and direct HLS (.m3u8).
+        """
+        if not url or not url.strip():
+            raise DownloaderError("The provided stream URL is empty.")
+
+        clean_url = url.strip()
+        if not (clean_url.startswith("http://") or clean_url.startswith("https://")):
+            raise DownloaderError(f"Invalid URL schema. Expected 'http://' or 'https://': {clean_url}")
+
+        valid_domains = [
+            "youtube.com", "youtu.be", "www.youtube.com", "m.youtube.com",
+            "twitch.tv", "www.twitch.tv",
+            "kick.com", "www.kick.com",
+        ]
+        is_known_platform = any(domain in clean_url.lower() for domain in valid_domains)
+        is_m3u8 = ".m3u8" in clean_url.lower()
+
+        if not (is_known_platform or is_m3u8):
+            raise DownloaderError(f"URL does not appear to be a supported live stream platform or .m3u8 stream: {clean_url}")
+
+        return clean_url
+
     def extract_metadata(self, url: str) -> Dict[str, Any]:
         """Extract metadata for a YouTube URL without downloading video content."""
         clean_url = self.validate_url(url)

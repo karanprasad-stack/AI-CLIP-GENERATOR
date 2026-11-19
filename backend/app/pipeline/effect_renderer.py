@@ -14,6 +14,11 @@ from backend.app.config import (
     CPU_THREADS,
     AUDIO_CODEC,
     AUDIO_BITRATE,
+    DEFAULT_ASPECT_RATIO,
+    ASPECT_RATIO_1_1,
+    OUTPUT_WIDTH,
+    OUTPUT_HEIGHT,
+    get_output_dimensions,
     EFFECT_SUBTLE_ZOOM,
     EFFECT_PUNCH_ZOOM,
     EFFECT_IMPACT_ZOOM,
@@ -70,6 +75,9 @@ class EffectRenderer:
         source_fps: float = 60.0,
         focal_x: float = 0.50,
         focal_y: float = 0.50,
+        output_width: int = OUTPUT_WIDTH,
+        output_height: int = OUTPUT_HEIGHT,
+        aspect_ratio: str = DEFAULT_ASPECT_RATIO,
     ) -> Optional[str]:
         """
         Builds a combined, deterministic FFmpeg filtergraph for zoom, shake, and flash accents.
@@ -77,6 +85,9 @@ class EffectRenderer:
         """
         if not effects:
             return None
+
+        if aspect_ratio == ASPECT_RATIO_1_1 and output_width == OUTPUT_WIDTH and output_height == OUTPUT_HEIGHT:
+            output_width, output_height = get_output_dimensions(aspect_ratio)
 
         zooms = [e for e in effects if e.type in [EFFECT_SUBTLE_ZOOM, EFFECT_PUNCH_ZOOM, EFFECT_IMPACT_ZOOM]]
         shakes = [e for e in effects if e.type in [EFFECT_MICRO_SHAKE, EFFECT_IMPACT_SHAKE]]
@@ -107,7 +118,7 @@ class EffectRenderer:
             y_expr = f"max(0,min(ih-ih/zoom,(ih-ih/zoom)*{focal_y:.2f}))"
 
             filters.append(
-                f"zoompan=z='{z_expr}':x='{x_expr}':y='{y_expr}':d=1:s=1080x1920:fps={source_fps:.1f}"
+                f"zoompan=z='{z_expr}':x='{x_expr}':y='{y_expr}':d=1:s={output_width}x{output_height}:fps={source_fps:.1f}"
             )
 
         # 2. Camera Shake Filter (via slight overscale + dynamic crop)
@@ -135,14 +146,14 @@ class EffectRenderer:
                 4
             )
             pad = max_amp + 4  # Safe margin so no black borders appear
-            scaled_w = 1080 + pad * 2
-            scaled_h = 1920 + pad * 2
+            scaled_w = output_width + pad * 2
+            scaled_h = output_height + pad * 2
 
             crop_x = f"{pad}+" + "+".join(shake_x_terms)
             crop_y = f"{pad}+" + "+".join(shake_y_terms)
 
             filters.append(f"scale={scaled_w}:{scaled_h}")
-            filters.append(f"crop=1080:1920:x='{crop_x}':y='{crop_y}'")
+            filters.append(f"crop={output_width}:{output_height}:x='{crop_x}':y='{crop_y}'")
 
         # 3. Emphasis Flash Accent (via eq brightness)
         if flashes:
@@ -168,6 +179,9 @@ class EffectRenderer:
         source_fps: float = 60.0,
         facecam_info: Optional[Dict[str, Any]] = None,
         force_cpu: bool = False,
+        output_width: int = OUTPUT_WIDTH,
+        output_height: int = OUTPUT_HEIGHT,
+        aspect_ratio: str = DEFAULT_ASPECT_RATIO,
     ) -> Dict[str, Any]:
         """
         Renders context-aware visual effects onto the input video.
@@ -189,6 +203,9 @@ class EffectRenderer:
             source_fps=source_fps,
             focal_x=focal_x,
             focal_y=focal_y,
+            output_width=output_width,
+            output_height=output_height,
+            aspect_ratio=aspect_ratio,
         )
 
         use_nvenc = self._nvenc_available and not force_cpu

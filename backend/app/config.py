@@ -1,7 +1,7 @@
 """Configuration for Phase 2.1.1 candidate detection, gaming signals, and scoring transparency."""
 
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent.parent
 DEFAULT_OUTPUT_DIR: Path = PROJECT_ROOT / "output"
@@ -239,6 +239,28 @@ TOP_N_CANDIDATES: int = 5
 # Clip Extraction Padding (in seconds)
 PRE_ROLL_SECONDS: float = 0.5
 POST_ROLL_SECONDS: float = 0.5
+
+# Selectable Aspect Ratios & Dimension Resolver
+ASPECT_RATIO_9_16: str = "9:16"
+ASPECT_RATIO_1_1: str = "1:1"
+DEFAULT_ASPECT_RATIO: str = ASPECT_RATIO_9_16
+
+SUPPORTED_ASPECT_RATIOS: Dict[str, Tuple[int, int]] = {
+    ASPECT_RATIO_9_16: (1080, 1920),
+    ASPECT_RATIO_1_1: (1080, 1080),
+}
+
+
+def get_output_dimensions(aspect_ratio: str = DEFAULT_ASPECT_RATIO) -> Tuple[int, int]:
+    """Resolves (width, height) pixel dimensions for supported aspect ratios."""
+    clean = str(aspect_ratio).strip()
+    if clean in SUPPORTED_ASPECT_RATIOS:
+        return SUPPORTED_ASPECT_RATIOS[clean]
+    raise ValueError(
+        f"Unsupported aspect ratio: '{aspect_ratio}'. "
+        f"Supported ratios: {list(SUPPORTED_ASPECT_RATIOS.keys())}"
+    )
+
 
 # Rendering Output Dimensions & Target
 OUTPUT_WIDTH: int = 1080

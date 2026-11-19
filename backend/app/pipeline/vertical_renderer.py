@@ -22,6 +22,9 @@ from backend.app.config import (
     LAYOUT_FACECAM,
     VERTICAL_FOCAL_X,
     FACECAM_TOP_HEIGHT_RATIO,
+    DEFAULT_ASPECT_RATIO,
+    ASPECT_RATIO_1_1,
+    get_output_dimensions,
 )
 
 
@@ -64,10 +67,20 @@ class VerticalRenderer:
         focal_x: float = VERTICAL_FOCAL_X,
         output_width: int = OUTPUT_WIDTH,
         output_height: int = OUTPUT_HEIGHT,
+        aspect_ratio: str = DEFAULT_ASPECT_RATIO,
     ) -> str:
-        """Construct the FFmpeg complex filtergraph for the selected layout."""
+        """Construct the FFmpeg complex filtergraph for the selected layout and aspect ratio."""
+        is_square = (aspect_ratio == ASPECT_RATIO_1_1) or (output_width == output_height)
+
         if layout == LAYOUT_SMART_CROP:
-            # Crop 9:16 window centered at focal_x and scale to 1080x1920
+            if is_square:
+                # 1:1 Square: center square crop from 16:9 gameplay
+                return (
+                    f"[0:v]crop=ih:ih:(iw-ih)*{focal_x}:0,"
+                    f"scale={output_width}:{output_height},"
+                    f"setsar=1[outv]"
+                )
+            # 9:16 Vertical: Crop 9:16 window centered at focal_x and scale to 1080x1920
             return (
                 f"[0:v]crop=ih*9/16:ih:(iw-ih*9/16)*{focal_x}:0,"
                 f"scale={output_width}:{output_height},"
@@ -75,12 +88,12 @@ class VerticalRenderer:
             )
 
         elif layout == LAYOUT_BLURRED_BG:
-            # Foreground 16:9 centered, background blurred & scaled to fill 1080x1920
+            # Foreground centered, background blurred & scaled to fill canvas
             return (
                 f"[0:v]split=2[fg][bg];"
                 f"[bg]scale=-1:{output_height},crop={output_width}:{output_height},"
                 f"boxblur=20:5,eq=brightness=-0.08:contrast=0.95[bg_blurred];"
-                f"[fg]scale={output_width}:-1[fg_scaled];"
+                f"[fg]scale={output_width}:-2[fg_scaled];"
                 f"[bg_blurred][fg_scaled]overlay=0:({output_height}-overlay_h)/2,"
                 f"setsar=1[outv]"
             )
@@ -99,16 +112,27 @@ class VerticalRenderer:
                 # Default top-right quadrant if region unavailable
                 crop_cam = "crop=iw*0.28:ih*0.35:iw*0.70:ih*0.05"
 
+            if is_square:
+                crop_game = f"crop=ih*{game_h}/{output_height}:ih:(iw-ih*{game_h}/{output_height})*{focal_x}:0"
+            else:
+                crop_game = f"crop=ih*9/16*{game_h}/{output_height}:ih:(iw-ih*9/16*{game_h}/{output_height})*{focal_x}:0"
+
             return (
                 f"[0:v]{crop_cam},scale={output_width}:{cam_h}:force_original_aspect_ratio=increase,"
                 f"crop={output_width}:{cam_h}[cam];"
-                f"[0:v]crop=ih*9/16*{game_h}/{output_height}:ih:(iw-ih*9/16*{game_h}/{output_height})*{focal_x}:0,"
+                f"[0:v]{crop_game},"
                 f"scale={output_width}:{game_h}[game];"
                 f"[cam][game]vstack=inputs=2,setsar=1[outv]"
             )
 
         else:
             # Fallback to smart crop
+            if is_square:
+                return (
+                    f"[0:v]crop=ih:ih:(iw-ih)*{focal_x}:0,"
+                    f"scale={output_width}:{output_height},"
+                    f"setsar=1[outv]"
+                )
             return (
                 f"[0:v]crop=ih*9/16:ih:(iw-ih*9/16)*{focal_x}:0,"
                 f"scale={output_width}:{output_height},"
@@ -123,9 +147,10 @@ class VerticalRenderer:
         facecam_region: Optional[Dict[str, float]] = None,
         source_fps: Optional[float] = None,
         force_cpu: bool = False,
+        aspect_ratio: str = DEFAULT_ASPECT_RATIO,
     ) -> Dict[str, Any]:
         """
-        Render a 1080x1920 9:16 vertical Short from the input clip.
+        Render a Short from the input clip with selectable aspect ratio (9:16 or 1:1).
         Preserves original audio and source FPS.
         """
         if not input_clip_path.exists():
@@ -134,9 +159,14 @@ class VerticalRenderer:
         output_short_path.parent.mkdir(parents=True, exist_ok=True)
         start_time = time.perf_counter()
 
+        width, height = get_output_dimensions(aspect_ratio)
+
         filtergraph = self.build_filtergraph(
             layout=layout,
             facecam_region=facecam_region,
+            output_width=width,
+            output_height=height,
+            aspect_ratio=aspect_ratio,
         )
 
         use_nvenc = self._nvenc_available and not force_cpu
@@ -193,6 +223,7 @@ class VerticalRenderer:
                         facecam_region=facecam_region,
                         source_fps=source_fps,
                         force_cpu=True,
+                        aspect_ratio=aspect_ratio,
                     )
                 raise RenderError(f"FFmpeg vertical render failed: {proc.stderr}")
 
@@ -207,10 +238,11 @@ class VerticalRenderer:
                 "encoder": encoder,
                 "rendering_time_sec": elapsed,
                 "output_resolution": {
-                    "width": OUTPUT_WIDTH,
-                    "height": OUTPUT_HEIGHT,
+                    "width": width,
+                    "height": height,
                 },
                 "fps": source_fps or OUTPUT_FPS_FALLBACK,
+                "aspect_ratio": aspect_ratio,
             }
 
         except subprocess.TimeoutExpired as e:

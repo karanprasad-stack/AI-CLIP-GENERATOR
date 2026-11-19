@@ -379,6 +379,7 @@ class PublishingPackageManager:
             "title_score": title_res["selected_score"],
             "metadata_quality": quality_score,
             "publishability": publishability,
+            "aspect_ratio": candidate.get("aspect_ratio", "9:16"),
             "validation": val_res,
             "metadata": candidate_meta,
         }

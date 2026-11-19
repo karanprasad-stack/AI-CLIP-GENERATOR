@@ -18,6 +18,7 @@ export interface ProcessingSettings {
   metadata_enabled: boolean
   llm: boolean
   quality_preset: 'Standard' | 'High' | 'Very High' | 'Custom'
+  aspect_ratio?: '9:16' | '1:1'
   resolution: string
   fps: number
   target_lufs: number
@@ -45,6 +46,7 @@ export interface TimelineVideoTrack {
   source_file: string
   layout: string
   resolution: string
+  aspect_ratio?: string
   fps: number
   enabled: boolean
 }
@@ -192,6 +194,7 @@ export interface Candidate {
   selection_reason?: string
   source_position_str?: string
   publishability?: PublishabilityInfo
+  aspect_ratio?: string
   rendered?: boolean
   output?: CandidateOutput | null
 }

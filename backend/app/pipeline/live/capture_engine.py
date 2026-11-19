@@ -168,41 +168,78 @@ class LiveCaptureEngine:
         audio_path = self.segments_dir / f"segment_{segment_id:04d}.wav"
 
         # Resolve live stream streamable URL
-        clean_url = self.downloader.validate_url(stream_url)
-        ydl_opts = self.downloader._build_ydl_opts({
-            "format": "best[ext=mp4]/best",
-        })
+        clean_url = self.downloader.validate_live_url(stream_url)
+        is_direct_hls = ".m3u8" in clean_url.lower()
 
         direct_stream_url = None
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(clean_url, download=False)
-                direct_stream_url = info.get("url")
-        except Exception as e:
-            raise CaptureError(f"Failed to resolve live stream endpoint: {e}") from e
+        if is_direct_hls:
+            direct_stream_url = clean_url
+        else:
+            ydl_opts = self.downloader._build_ydl_opts({
+                "format": "best[protocol^=m3u8_native]/best[protocol^=m3u8]/bestvideo+bestaudio/best",
+            })
+
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(clean_url, download=False)
+                    if info:
+                        if info.get("is_live") is False and info.get("live_status") == "was_live":
+                            raise CaptureError(f"Stream is not currently live (status: was_live): {clean_url}")
+                        direct_stream_url = info.get("url")
+                        if not direct_stream_url and "requested_formats" in info:
+                            direct_stream_url = "\n".join(f.get("url", "") for f in info["requested_formats"] if f.get("url"))
+            except Exception as e:
+                if isinstance(e, CaptureError):
+                    raise
+                raise CaptureError(f"Failed to resolve live stream endpoint: {e}") from e
 
         if not direct_stream_url:
             direct_stream_url = clean_url
+
+        stream_urls = [u.strip() for u in direct_stream_url.splitlines() if u.strip()]
 
         cmd = [
             self.ffmpeg_path,
             "-y",
             "-nostats",
             "-loglevel", "error",
-            "-i", direct_stream_url,
-            "-t", f"{target_dur:.2f}",
+            "-reconnect", "1",
+            "-reconnect_streamed", "1",
+            "-reconnect_delay_max", "5",
+        ]
+
+        if len(stream_urls) >= 2:
+            cmd.extend([
+                "-i", stream_urls[0],
+                "-reconnect", "1",
+                "-reconnect_streamed", "1",
+                "-reconnect_delay_max", "5",
+                "-i", stream_urls[1],
+                "-t", f"{target_dur:.2f}",
+                "-map", "0:v:0",
+                "-map", "1:a:0?",
+            ])
+        else:
+            url_to_use = stream_urls[0] if stream_urls else direct_stream_url
+            cmd.extend([
+                "-i", url_to_use,
+                "-t", f"{target_dur:.2f}",
+            ])
+
+        cmd.extend([
             "-c:v", "libx264",
             "-preset", "veryfast",
             "-crf", "22",
             "-c:a", "aac",
             "-b:a", "128k",
             str(video_path),
-        ]
+        ])
 
+        capture_timeout = int(target_dur + 60)
         try:
-            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=60)
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=capture_timeout)
         except subprocess.TimeoutExpired as e:
-            raise CaptureError(f"Audio extraction timed out for {video_file}: {e}") from e
+            raise CaptureError(f"Live segment capture timed out for {video_path}: {e}") from e
         if res.returncode != 0 or not video_path.exists() or video_path.stat().st_size == 0:
             raise CaptureError(f"Live segment capture failed: {res.stderr}")
 

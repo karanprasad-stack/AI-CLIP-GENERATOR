@@ -442,7 +442,7 @@ export const TimelineEditor: React.FC<TimelineEditorProps> = ({
             position: 'relative',
             height: '100%',
             maxHeight: 280,
-            aspectRatio: '9 / 16',
+            aspectRatio: timeline?.video_track?.aspect_ratio === '1:1' ? '1 / 1' : '9 / 16',
             borderRadius: 6,
             overflow: 'hidden',
             background: '#000',

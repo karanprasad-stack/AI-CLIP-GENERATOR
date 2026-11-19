@@ -44,11 +44,15 @@ class TimelineEdlGenerator:
         phase6a_timeline: Optional[Dict[str, Any]] = None,
         source_video_path: Optional[str] = "source.mp4",
         layout: str = "smart_crop",
+        aspect_ratio: str = "9:16",
     ) -> TimelineEDL:
         """Constructs an initial TimelineEDL document from existing AI artifacts."""
         start = float(candidate.get("start", candidate.get("candidate_start", 0.0)))
         end = float(candidate.get("end", candidate.get("candidate_end", 60.0)))
         duration = float(candidate.get("duration", candidate.get("candidate_duration", end - start)))
+
+        cand_aspect = candidate.get("aspect_ratio", aspect_ratio) or "9:16"
+        res = "1080x1080" if cand_aspect == "1:1" else "1080x1920"
 
         # 1. Boundaries Track
         boundaries = TimelineBoundaries(
@@ -61,7 +65,8 @@ class TimelineEdlGenerator:
         video_track = TimelineVideoTrack(
             source_file=Path(source_video_path).name if source_video_path else "source.mp4",
             layout=candidate.get("layout", layout) or "smart_crop",
-            resolution="1080x1920",
+            resolution=res,
+            aspect_ratio=cand_aspect,
             fps=60,
             enabled=True,
         )
