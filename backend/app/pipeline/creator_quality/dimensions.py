@@ -93,9 +93,12 @@ def evaluate_narrative_quality(
     if duration < 15.0:
         warnings.append(f"Short duration ({duration:.1f}s) may reduce narrative pacing")
         score -= 10.0
-    elif 25.0 <= duration <= 55.0:
+    elif 15.0 <= duration <= 180.0:
         score += 8.0
         reasons.append(f"Ideal Short duration ({duration:.1f}s) for balanced narrative arc")
+    else:
+        warnings.append(f"Extended duration ({duration:.1f}s) exceeds maximum short guidelines")
+        score -= 10.0
 
     # Climax position check
     climax_time = candidate.get("climax_timestamp") or candidate.get("peak_timestamp")

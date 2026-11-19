@@ -312,6 +312,23 @@ class EffectEngine:
                     "confidence": float(em.get("confidence", 0.8)),
                 })
 
+        # 4. Phase 12A/12B Confirmed Gameplay Events
+        gameplay_events = candidate.get("gameplay_events", [])
+        for ev in gameplay_events:
+            ev_dict = ev if isinstance(ev, dict) else (ev.to_dict() if hasattr(ev, "to_dict") else vars(ev))
+            if ev_dict.get("status") == "supporting":
+                continue
+            ev_t = float(ev_dict.get("timestamp", 0.0))
+            if clip_start <= ev_t <= clip_end:
+                rel_t = max(0.0, min(clip_duration, ev_t - clip_start))
+                raw_signals.append({
+                    "kind": "gameplay",
+                    "signal": str(ev_dict.get("event_type", "gameplay_event")),
+                    "time": rel_t,
+                    "global_time": ev_t,
+                    "confidence": float(ev_dict.get("confidence", 0.85)),
+                })
+
         if not raw_signals:
             return []
 
@@ -522,6 +539,7 @@ class EffectEngine:
         self,
         raw_effects: List[EffectEvent],
         clip_duration: float,
+        max_effects_per_min: int = 12,
     ) -> Tuple[List[EffectEvent], List[Dict[str, Any]]]:
         """
         Enforces effect priority hierarchy and minimum spacing (cooldowns) to avoid chaotic spam.
@@ -636,6 +654,33 @@ class EffectEngine:
                     accepted.append(f)
                     last_flash = f
 
+        # 4. Enforce maximum effects per minute cap to prevent excessive density
+        if clip_duration > 0:
+            max_allowed = max(4, int(round((clip_duration / 60.0) * max_effects_per_min)))
+            if len(accepted) > max_allowed:
+                type_rank = {
+                    EFFECT_IMPACT_ZOOM: 5,
+                    EFFECT_IMPACT_SHAKE: 4,
+                    EFFECT_EMPHASIS_FLASH: 3,
+                    EFFECT_PUNCH_ZOOM: 2,
+                    EFFECT_MICRO_SHAKE: 1,
+                    EFFECT_SUBTLE_ZOOM: 0,
+                }
+                ranked = sorted(
+                    accepted,
+                    key=lambda e: (type_rank.get(e.type, 0), e.intensity, e.confidence),
+                    reverse=True,
+                )
+                kept = ranked[:max_allowed]
+                dropped = ranked[max_allowed:]
+                for d in dropped:
+                    suppressed.append({
+                        "type": d.type,
+                        "start": d.start,
+                        "reason": f"Suppressed by max effects per minute cap ({max_allowed} max for {clip_duration:.1f}s)",
+                    })
+                accepted = kept
+
         # Final sort chronologically
         accepted.sort(key=lambda e: (e.start, e.type))
         return accepted, suppressed
@@ -665,12 +710,144 @@ class EffectEngine:
             clip_duration=clip_duration,
         )
 
-        # 2. Generate raw effects
+        # 2. Generate raw effects from multi-signal clustering
         raw_effects, initial_suppressed = self.generate_raw_effects(
             moments=moments,
             clip_duration=clip_duration,
             facecam_info=facecam_info,
         )
+
+        # 2b. Direct event-driven effect generation for confirmed gameplay events
+        has_facecam = facecam_info and facecam_info.get("facecam_detected", False)
+        focal_point = (0.50, 0.65) if has_facecam else (0.50, 0.50)
+
+        gameplay_events = candidate.get("gameplay_events", [])
+        for ev in gameplay_events:
+            ev_dict = ev if isinstance(ev, dict) else (ev.to_dict() if hasattr(ev, "to_dict") else vars(ev))
+            if ev_dict.get("status") == "supporting":
+                continue
+            ev_t = float(ev_dict.get("timestamp", 0.0))
+            if not (clip_start <= ev_t <= clip_end):
+                continue
+
+            rel_t = max(0.0, min(clip_duration, ev_t - clip_start))
+            ev_type = str(ev_dict.get("event_type", "")).lower()
+            ev_conf = float(ev_dict.get("confidence", 0.85))
+
+            if ev_type in ("kill", "headshot"):
+                dur_z = PUNCH_ZOOM_DURATION
+                dur_s = MICRO_SHAKE_DURATION
+                z_start = max(0.0, rel_t - dur_z * 0.35)
+                z_end = min(clip_duration, z_start + dur_z)
+                s_start = max(0.0, rel_t - dur_s * 0.25)
+                s_end = min(clip_duration, s_start + dur_s)
+
+                raw_effects.append(
+                    EffectEvent(
+                        type=EFFECT_PUNCH_ZOOM,
+                        start=z_start,
+                        end=z_end,
+                        intensity=0.85,
+                        confidence=ev_conf,
+                        reason=f"gameplay_event:{ev_type}",
+                        source_events=["gameplay_event"],
+                        focal_point=focal_point,
+                    )
+                )
+                raw_effects.append(
+                    EffectEvent(
+                        type=EFFECT_MICRO_SHAKE,
+                        start=s_start,
+                        end=s_end,
+                        intensity=0.75,
+                        confidence=ev_conf,
+                        reason=f"gameplay_event:{ev_type} (micro_shake)",
+                        source_events=["gameplay_event"],
+                    )
+                )
+            elif ev_type in ("ace", "ace_candidate", "clutch", "clutch_candidate", "multi_kill", "round_win"):
+                dur_z = IMPACT_ZOOM_DURATION
+                dur_s = IMPACT_SHAKE_DURATION
+                dur_f = FLASH_DURATION
+                z_start = max(0.0, rel_t - dur_z * 0.30)
+                z_end = min(clip_duration, z_start + dur_z)
+                s_start = max(0.0, rel_t - dur_s * 0.20)
+                s_end = min(clip_duration, s_start + dur_s)
+                f_start = max(0.0, rel_t - dur_f * 0.20)
+                f_end = min(clip_duration, f_start + dur_f)
+
+                raw_effects.append(
+                    EffectEvent(
+                        type=EFFECT_IMPACT_ZOOM,
+                        start=z_start,
+                        end=z_end,
+                        intensity=0.95,
+                        confidence=ev_conf,
+                        reason=f"gameplay_climax:{ev_type}",
+                        source_events=["gameplay_climax"],
+                        focal_point=focal_point,
+                    )
+                )
+                raw_effects.append(
+                    EffectEvent(
+                        type=EFFECT_IMPACT_SHAKE,
+                        start=s_start,
+                        end=s_end,
+                        intensity=0.90,
+                        confidence=ev_conf,
+                        reason=f"gameplay_climax:{ev_type} (impact_shake)",
+                        source_events=["gameplay_climax"],
+                    )
+                )
+                raw_effects.append(
+                    EffectEvent(
+                        type=EFFECT_EMPHASIS_FLASH,
+                        start=f_start,
+                        end=f_end,
+                        intensity=0.85,
+                        confidence=ev_conf,
+                        reason=f"gameplay_climax:{ev_type} (emphasis_flash)",
+                        source_events=["gameplay_climax"],
+                    )
+                )
+
+        # Direct sequence climaxes if available
+        gameplay_sequences = candidate.get("gameplay_sequences", [])
+        for seq in gameplay_sequences:
+            seq_dict = seq if isinstance(seq, dict) else (seq.to_dict() if hasattr(seq, "to_dict") else vars(seq))
+            climax_t = float(seq_dict.get("climax_timestamp", seq_dict.get("end_time", 0.0)))
+            seq_type = str(seq_dict.get("sequence_type", "climax")).lower()
+            if clip_start <= climax_t <= clip_end:
+                rel_t = max(0.0, min(clip_duration, climax_t - clip_start))
+                dur_z = IMPACT_ZOOM_DURATION
+                dur_s = IMPACT_SHAKE_DURATION
+                z_start = max(0.0, rel_t - dur_z * 0.30)
+                z_end = min(clip_duration, z_start + dur_z)
+                s_start = max(0.0, rel_t - dur_s * 0.20)
+                s_end = min(clip_duration, s_start + dur_s)
+                raw_effects.append(
+                    EffectEvent(
+                        type=EFFECT_IMPACT_ZOOM,
+                        start=z_start,
+                        end=z_end,
+                        intensity=0.95,
+                        confidence=0.90,
+                        reason=f"gameplay_sequence:{seq_type}",
+                        source_events=["gameplay_sequence"],
+                        focal_point=focal_point,
+                    )
+                )
+                raw_effects.append(
+                    EffectEvent(
+                        type=EFFECT_IMPACT_SHAKE,
+                        start=s_start,
+                        end=s_end,
+                        intensity=0.90,
+                        confidence=0.90,
+                        reason=f"gameplay_sequence:{seq_type} (impact_shake)",
+                        source_events=["gameplay_sequence"],
+                    )
+                )
 
         # 3. Resolve cooldowns and overlaps
         final_effects, cooldown_suppressed = self.resolve_conflicts_and_cooldowns(

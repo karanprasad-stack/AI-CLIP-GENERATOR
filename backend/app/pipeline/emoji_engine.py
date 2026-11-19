@@ -50,6 +50,7 @@ class EmojiEngine:
         clip_end: float,
         audio_peaks: Optional[List[Dict[str, Any]]] = None,
         clip_duration: Optional[float] = None,
+        gameplay_events: Optional[List[Dict[str, Any]]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Scans words and phrases in [clip_start, clip_end] for reaction signals,
@@ -174,6 +175,77 @@ class EmojiEngine:
                         "confidence": round(min(1.0, conf), 2),
                         "reason": f"gameplay_event: '{cw}'" + (" + audio_peak" if aligned_audio else ""),
                         "source_signal": cw,
+                    })
+
+        # 2.5 Process concrete Phase 12A/12C gameplay events
+        if gameplay_events:
+            for ev in gameplay_events:
+                status = ev.get("status", "")
+                if status == "supporting":
+                    continue
+
+                ev_type = str(ev.get("event_type", "")).lower()
+                conf = float(ev.get("confidence", 0.85))
+                ev_time = float(ev.get("start_time", ev.get("timestamp", 0.0)))
+                if not (clip_start <= ev_time <= clip_end):
+                    continue
+
+                meta = ev.get("metadata", {})
+                is_headshot = (ev_type == "headshot") or bool(meta.get("headshot", False))
+
+                if ev_type in ["ace", "ace_candidate"]:
+                    raw_events.append({
+                        "global_time": ev_time,
+                        "emoji": "👑",
+                        "category": "fire",
+                        "confidence": round(min(1.0, max(0.95, conf)), 2),
+                        "reason": f"gameplay_event: ace ({status})",
+                        "source_signal": "ace",
+                    })
+                elif ev_type in ["clutch", "clutch_candidate", "1vx_candidate"]:
+                    raw_events.append({
+                        "global_time": ev_time,
+                        "emoji": "🥶",
+                        "category": "fire",
+                        "confidence": round(min(1.0, max(0.92, conf)), 2),
+                        "reason": f"gameplay_event: clutch ({status})",
+                        "source_signal": "clutch",
+                    })
+                elif ev_type in ["multi_kill", "rapid_kill_sequence"]:
+                    raw_events.append({
+                        "global_time": ev_time,
+                        "emoji": "🔥",
+                        "category": "fire",
+                        "confidence": round(min(1.0, max(0.88, conf)), 2),
+                        "reason": f"gameplay_event: multi_kill ({status})",
+                        "source_signal": "multi_kill",
+                    })
+                elif is_headshot:
+                    raw_events.append({
+                        "global_time": ev_time,
+                        "emoji": "🎯",
+                        "category": "skill",
+                        "confidence": round(min(1.0, max(0.85, conf)), 2),
+                        "reason": f"gameplay_event: headshot ({status})",
+                        "source_signal": "headshot",
+                    })
+                elif ev_type in ["round_win", "spike_defused", "spike_denied"]:
+                    raw_events.append({
+                        "global_time": ev_time,
+                        "emoji": "🏆",
+                        "category": "fire",
+                        "confidence": round(min(1.0, max(0.90, conf)), 2),
+                        "reason": f"gameplay_event: {ev_type} ({status})",
+                        "source_signal": ev_type,
+                    })
+                elif ev_type == "kill":
+                    raw_events.append({
+                        "global_time": ev_time,
+                        "emoji": "💀",
+                        "category": "disbelief",
+                        "confidence": round(min(1.0, max(0.80, conf)), 2),
+                        "reason": f"gameplay_event: kill ({status})",
+                        "source_signal": "kill",
                     })
 
         # 3. Filter by minimum confidence threshold

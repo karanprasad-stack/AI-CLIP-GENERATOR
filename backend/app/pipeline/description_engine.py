@@ -66,6 +66,30 @@ class DescriptionEngine:
 
         hooks: List[str] = []
 
+        # 0. High-Priority Verified Gameplay Hooks (Phase 12C)
+        gp_stats = getattr(summary, "gameplay_stats", {}) or {}
+        aces = gp_stats.get("aces", 0)
+        clutches = gp_stats.get("clutches", 0)
+        multi_kills = gp_stats.get("multi_kills", 0)
+        kills = gp_stats.get("kills", 0)
+        headshots = gp_stats.get("headshots", 0)
+        round_wins = gp_stats.get("round_wins", 0)
+
+        if aces > 0:
+            hooks.append(f"An unbelievable ACE in {game}—taking down all 5 enemies to secure the round.")
+            hooks.append(f"Absolute dominance in {game}! Watch this full 5K Ace round from start to finish.")
+        if clutches > 0:
+            hooks.append(f"Ice in the veins under maximum pressure: an insane {game} clutch when everything was on the line.")
+            hooks.append(f"Impossible 1vX situation in {game} turned into a masterclass clutch play.")
+        if multi_kills > 0 or kills >= 3:
+            k_num = max(kills, 3)
+            hooks.append(f"Rapid {k_num}K sequence in {game} with crisp gunplay and clinical positioning.")
+            hooks.append(f"Clean multikill round in {game} wiping out the enemy push.")
+        if headshots > 0:
+            hooks.append(f"Pure precision: lethal headshots in {game} shutting down the site push instantly.")
+        if round_wins > 0:
+            hooks.append(f"A high-stakes round win in {game} decided in the final split second.")
+
         # 1. Event-specific hooks
         if "timing" in ev or "timing" in secs or (clean_rx and "timing" in clean_rx.lower()):
             hooks.append(f"When the timing lines up like this in {game}, you just have to laugh. The entire round fell apart in seconds.")

@@ -14,6 +14,8 @@ from backend.app.config import (
     MAX_OVERLAP_SECONDS,
     EVENT_CLUSTER_WINDOW,
     HIGH_IMPACT_GAMING_WORDS,
+    get_duration_tier,
+    get_narrative_structure,
 )
 from backend.app.pipeline.games.models import EventStatus
 from .audio_analyzer import AudioAnalyzer
@@ -576,8 +578,15 @@ class CandidateRanker:
         if 38.0 <= duration <= 52.0:
             score += 10.0
             reasons.append("ideal 40-50s duration for mobile shorts pacing")
-        elif 30.0 <= duration <= 60.0:
-            score += 5.0
+        elif 15.0 <= duration <= 30.0:
+            score += 10.0
+            reasons.append("ideal 15-30s quick clip pacing")
+        elif 30.0 <= duration <= 90.0:
+            score += 8.0
+            reasons.append("ideal standard clip pacing")
+        elif 90.0 < duration <= 180.0:
+            score += 10.0 if duration <= 150.0 else 7.0
+            reasons.append("ideal extended story pacing")
 
         final_boundary_score = min(100.0, max(10.0, score))
         metrics = {
@@ -771,10 +780,15 @@ class CandidateRanker:
                     if h.explanation and h.explanation not in ranking_reasons:
                         ranking_reasons.insert(0, h.explanation)
 
+            tier = get_duration_tier(dur)
+            narrative = get_narrative_structure(tier)
+
             candidate_obj = {
                 "start": start_sec,
                 "end": end_sec,
                 "duration": dur,
+                "duration_tier": tier,
+                "narrative_structure": narrative,
                 "score": composite_score,
                 "final_score": composite_score,
                 "active_weights": active_weights,

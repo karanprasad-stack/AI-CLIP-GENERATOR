@@ -1,7 +1,7 @@
 """Configuration for Phase 2.1.1 candidate detection, gaming signals, and scoring transparency."""
 
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any, Optional
 
 PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent.parent
 DEFAULT_OUTPUT_DIR: Path = PROJECT_ROOT / "output"
@@ -306,6 +306,38 @@ FACECAM_TOP_HEIGHT_RATIO: float = 0.35
 # Variable Duration Support (15s to 180s)
 MIN_CLIP_DURATION: float = 15.0
 MAX_CLIP_DURATION: float = 180.0
+MIN_CLIP_DURATION_V2: float = 15.0
+MAX_CLIP_DURATION_V2: float = 180.0
+
+DURATION_TIERS: Dict[str, Tuple[float, float]] = {
+    "quick": (15.0, 30.0),      # Hook -> Action -> Payoff
+    "standard": (30.0, 90.0),   # Setup -> Escalation -> Major Event -> Reaction / Payoff
+    "extended": (90.0, 180.0),  # Context -> Situation -> Pressure -> First Engagement -> Escalation -> Major Event -> Resolution -> Reaction
+}
+
+DURATION_TIER_NARRATIVE_STAGES: Dict[str, List[str]] = {
+    "quick": ["Hook", "Action", "Payoff"],
+    "standard": ["Setup", "Escalation", "Major Event", "Reaction / Payoff"],
+    "extended": ["Context", "Situation", "Pressure", "First Engagement", "Escalation", "Major Event", "Resolution", "Reaction"],
+}
+
+
+def get_duration_tier(duration: float) -> str:
+    """Classifies duration into quick (15-30s), standard (30-90s), or extended (90-180s)."""
+    if duration <= 30.0:
+        return "quick"
+    elif duration <= 90.0:
+        return "standard"
+    return "extended"
+
+
+def get_narrative_structure(tier_or_duration: Any) -> List[str]:
+    """Returns narrative stage list corresponding to a tier name or numeric duration."""
+    if isinstance(tier_or_duration, (int, float)):
+        tier = get_duration_tier(float(tier_or_duration))
+    else:
+        tier = str(tier_or_duration).lower().strip()
+    return DURATION_TIER_NARRATIVE_STAGES.get(tier, DURATION_TIER_NARRATIVE_STAGES["standard"])
 
 # Caption Word Grouping Constraints
 MIN_WORDS_PER_GROUP: int = 1

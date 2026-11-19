@@ -31,6 +31,17 @@ class HashtagEngine:
             if clean_game.lower() == "csgo":
                 raw_tags.append("#CounterStrike")
 
+        # 2b. Verified Gameplay Event Tags (Phase 12C)
+        gp_stats = getattr(summary, "gameplay_stats", {}) or {}
+        if gp_stats.get("aces", 0) > 0:
+            raw_tags.extend([f"#{clean_game}Ace", "#AceClip", "#Ace"])
+        if gp_stats.get("clutches", 0) > 0:
+            raw_tags.extend([f"#{clean_game}Clutch", "#ClutchClip", "#Clutch"])
+        if gp_stats.get("multi_kills", 0) > 0 or gp_stats.get("kills", 0) >= 3:
+            raw_tags.extend(["#MultiKill", "#CleanKills"])
+        if gp_stats.get("headshots", 0) > 0:
+            raw_tags.extend(["#Headshot", "#OneTap"])
+
         # 3. Candidate-Specific Event Tag
         ev = summary.primary_event.strip().lower()
         if ev and ev not in ["gameplay highlight", "reaction", "shock"]:
@@ -99,6 +110,14 @@ class HashtagEngine:
             keywords.append("gaming clutches")
         else:
             keywords.append(f"{game} highlights")
+
+        gp_stats = getattr(summary, "gameplay_stats", {}) or {}
+        if gp_stats.get("aces", 0) > 0:
+            keywords.extend([f"{game} ace", f"{game} 5k", "ace highlight"])
+        if gp_stats.get("clutches", 0) > 0:
+            keywords.extend([f"{game} 1vX clutch", "insane clutch"])
+        if gp_stats.get("headshots", 0) > 0:
+            keywords.extend([f"{game} headshots", "one tap"])
 
         keywords.extend(["gaming", "gaming shorts", "youtube shorts", "FPS highlights"])
 

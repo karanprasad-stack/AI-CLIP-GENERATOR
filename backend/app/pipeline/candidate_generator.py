@@ -5,6 +5,8 @@ from backend.app.config import (
     MIN_CANDIDATE_DURATION,
     MAX_CANDIDATE_DURATION,
     TARGET_CANDIDATE_DURATION,
+    MIN_CLIP_DURATION_V2,
+    MAX_CLIP_DURATION_V2,
     GAMEPLAY_WORDS,
     REACTION_WORDS,
     REACTION_PHRASES,
@@ -13,16 +15,35 @@ from .transcript_analyzer import TranscriptAnalyzer
 
 
 class CandidateGenerator:
-    """Generates candidate 30-60 second clip windows anchored around meaningful audio/transcript events."""
+    """Generates candidate 15-180 second clip windows anchored around meaningful audio/transcript/gameplay events."""
 
     def __init__(
         self,
         min_duration: float = MIN_CANDIDATE_DURATION,
         max_duration: float = MAX_CANDIDATE_DURATION,
         target_duration: float = TARGET_CANDIDATE_DURATION,
+        duration_mode: str = "auto",
+        preferred_duration_range: Optional[Tuple[float, float]] = None,
     ):
-        self.min_duration = min_duration
-        self.max_duration = max_duration
+        self.duration_mode = duration_mode
+        self.preferred_duration_range = preferred_duration_range
+
+        if preferred_duration_range:
+            self.min_duration = float(preferred_duration_range[0])
+            self.max_duration = float(preferred_duration_range[1])
+        elif duration_mode == "quick":
+            self.min_duration = 15.0
+            self.max_duration = 30.0
+        elif duration_mode == "standard":
+            self.min_duration = 30.0
+            self.max_duration = 90.0
+        elif duration_mode == "extended":
+            self.min_duration = 90.0
+            self.max_duration = 180.0
+        else:
+            self.min_duration = min_duration
+            self.max_duration = max_duration
+
         self.target_duration = target_duration
 
     def generate_candidates(
@@ -113,16 +134,34 @@ class CandidateGenerator:
 
         candidates_set = set()
 
-        # Step 2: For each anchor event, build Hook -> Event -> Payoff windows
+        # Step 2: Multi-Tier Duration Targets (15s to 180s)
+        dur_targets = []
+        if self.min_duration <= 25.0:
+            dur_targets.extend([18.0, 24.0, 28.0])
+        dur_targets.extend([36.0, 44.0, 52.0])
+        if self.max_duration >= 70.0:
+            dur_targets.extend([68.0, 80.0])
+        if self.max_duration >= 110.0:
+            dur_targets.extend([105.0, 130.0, 160.0])
+
+        dur_targets = sorted(list(set([d for d in dur_targets if self.min_duration <= d <= self.max_duration])))
+        if not dur_targets:
+            dur_targets = [self.min_duration, (self.min_duration + self.max_duration) / 2.0, self.max_duration]
+
+        lead_ins = [4.0, 8.0, 12.0, 18.0, 24.0]
+
+        # For each anchor event, build Hook -> Event -> Payoff windows across tiers
         for anchor in all_anchors:
-            for lead_in in [12.0, 18.0, 24.0]:
+            for lead_in in lead_ins:
+                if lead_in >= self.max_duration * 0.6:
+                    continue
                 target_start = max(0.0, anchor - lead_in)
                 snapped_start = transcript_analyzer.find_nearest_sentence_start(target_start)
 
                 if snapped_start >= anchor:
                     snapped_start = target_start
 
-                for dur_target in [36.0, 44.0, 52.0]:
+                for dur_target in dur_targets:
                     target_end = min(video_duration, snapped_start + dur_target)
                     snapped_end = transcript_analyzer.find_nearest_sentence_end(target_end)
 
@@ -142,8 +181,10 @@ class CandidateGenerator:
             ev_len = ev_end - ev_start
 
             if ev_len <= self.max_duration:
-                for lead_in in [8.0, 12.0, 16.0]:
-                    for lead_out in [6.0, 10.0, 14.0]:
+                combat_lead_ins = [4.0, 8.0, 12.0, 16.0]
+                combat_lead_outs = [4.0, 6.0, 10.0, 14.0]
+                for lead_in in combat_lead_ins:
+                    for lead_out in combat_lead_outs:
                         target_start = max(0.0, ev_start - lead_in)
                         snapped_start = transcript_analyzer.find_nearest_sentence_start(target_start)
                         if snapped_start > ev_start:
@@ -174,6 +215,69 @@ class CandidateGenerator:
 
                         if self.min_duration <= dur <= self.max_duration and snapped_start <= ev_start and snapped_end >= ev_end:
                             candidates_set.add((round(snapped_start, 2), round(snapped_end, 2)))
+
+        # Step 2.6: Phase 12C Round-Aware Context Expansion
+        # Connect setup (opening kill / spike plant) -> climax (multi-kill / clutch) -> resolution (defuse / round win)
+        if gameplay_timeline and hasattr(gameplay_timeline, "events"):
+            all_events = getattr(gameplay_timeline, "events", [])
+            round_end_events = [
+                e for e in all_events
+                if getattr(e, "event_type", "") in {"round_win", "round_loss", "round_ending_kill"}
+            ]
+
+            for ev in priority_events:
+                # Find round floor (prior round conclusion or 0)
+                prior_round_ends = [e.end_time for e in round_end_events if e.end_time < (ev.start_time - 5.0)]
+                round_floor = max(prior_round_ends) if prior_round_ends else 0.0
+
+                # Find resolution of current round
+                curr_round_ends = [e for e in round_end_events if round_floor <= e.start_time and e.end_time >= ev.start_time]
+                curr_resolution = curr_round_ends[0] if curr_round_ends else None
+
+                # Find ceiling (subsequent round boundary or video_duration)
+                if curr_resolution:
+                    subsequent_bounds = [e.start_time for e in round_end_events if e.start_time > (curr_resolution.end_time + 10.0)]
+                else:
+                    subsequent_bounds = [e.start_time for e in round_end_events if e.start_time > (ev.end_time + 10.0)]
+                round_ceil = min(subsequent_bounds) if subsequent_bounds else video_duration
+
+                # Preceding round events in same round
+                earlier_events = [
+                    e for e in all_events
+                    if round_floor <= e.start_time < ev.start_time
+                    and getattr(e, "event_type", "") in {"opening_kill", "first_blood", "spike_planted", "kill"}
+                    and getattr(e, "status", "") != "supporting"
+                ]
+
+                # Subsequent round events in same round
+                later_events = [
+                    e for e in all_events
+                    if ev.end_time < e.end_time <= round_ceil
+                    and getattr(e, "event_type", "") in {"round_win", "spike_defused", "spike_denied", "round_ending_kill"}
+                    and getattr(e, "status", "") != "supporting"
+                ]
+
+                if earlier_events or later_events:
+                    first_ev_start = min([e.start_time for e in earlier_events] + [ev.start_time])
+                    last_ev_end = max([e.end_time for e in later_events] + [ev.end_time])
+
+                    # Include natural 4-8s pre-engagement lead-in and post-round celebration tail
+                    exp_start = max(round_floor, max(0.0, first_ev_start - 6.0))
+                    exp_end = min(round_ceil, min(video_duration, last_ev_end + 6.0))
+
+                    snapped_exp_start = transcript_analyzer.find_nearest_sentence_start(exp_start)
+                    if snapped_exp_start > first_ev_start:
+                        snapped_exp_start = exp_start
+                    snapped_exp_start = max(round_floor, max(0.0, snapped_exp_start))
+
+                    snapped_exp_end = transcript_analyzer.find_nearest_sentence_end(exp_end)
+                    if snapped_exp_end < last_ev_end:
+                        snapped_exp_end = exp_end
+                    snapped_exp_end = min(round_ceil, min(video_duration, snapped_exp_end))
+
+                    exp_dur = snapped_exp_end - snapped_exp_start
+                    if self.min_duration <= exp_dur <= self.max_duration:
+                        candidates_set.add((round(snapped_exp_start, 2), round(snapped_exp_end, 2)))
 
         # Also add sentence-aligned windows directly from transcript
         sentences = transcript_analyzer.sentences

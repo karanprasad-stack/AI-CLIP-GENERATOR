@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Download, RefreshCw, Check, Film, Image as ImageIcon, FileText, ArrowLeft, Tag, Key, AlertTriangle, ShieldCheck, Sliders } from 'lucide-react'
+import { Download, RefreshCw, Check, Film, Image as ImageIcon, FileText, ArrowLeft, Tag, Key, AlertTriangle, ShieldCheck, Sliders, Copy } from 'lucide-react'
 import type { ProjectDetail } from '../types'
 import { getFileUrl, getPackageDownloadUrl, updateMetadata, regenerateMetadata } from '../api/client'
 import { TimelineEditor } from './TimelineEditor/TimelineEditor'
@@ -30,6 +30,7 @@ export const PublishingReview: React.FC<PublishingReviewProps> = ({
   const [isRegenerating, setIsRegenerating] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [isTimelineOpen, setIsTimelineOpen] = useState(false)
+  const [copiedDesc, setCopiedDesc] = useState(false)
 
   // Sync when active candidate tab changes
   React.useEffect(() => {
@@ -409,9 +410,26 @@ export const PublishingReview: React.FC<PublishingReviewProps> = ({
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
               <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Video Description & Attribution</label>
-              <span style={{ fontSize: '0.75rem', color: isDescLengthValid ? 'var(--accent-green)' : 'var(--accent-amber)', fontWeight: 600 }}>
-                {description.length} / 500 chars (target 40–500)
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    if (description) {
+                      navigator.clipboard.writeText(description)
+                      setCopiedDesc(true)
+                      setTimeout(() => setCopiedDesc(false), 2000)
+                    }
+                  }}
+                  style={{ padding: '3px 8px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 4 }}
+                >
+                  {copiedDesc ? <Check size={12} color="var(--accent-green)" /> : <Copy size={12} />}
+                  <span>{copiedDesc ? 'Copied!' : 'Copy Description'}</span>
+                </button>
+                <span style={{ fontSize: '0.75rem', color: isDescLengthValid ? 'var(--accent-green)' : 'var(--accent-amber)', fontWeight: 600 }}>
+                  {description.length} / 500 chars (target 40–500)
+                </span>
+              </div>
             </div>
             <textarea
               className="textarea"

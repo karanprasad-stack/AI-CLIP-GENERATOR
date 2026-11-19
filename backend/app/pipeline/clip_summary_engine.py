@@ -4,6 +4,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Dict, Any, List, Optional
 
+from backend.app.config import get_duration_tier
+
 
 @dataclass
 class ClipSummary:
@@ -21,6 +23,8 @@ class ClipSummary:
     visual_effect_count: int
     sfx_count: int
     source_signals: List[str] = field(default_factory=list)
+    gameplay_stats: Dict[str, Any] = field(default_factory=dict)
+    duration_tier: str = "standard"
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -37,6 +41,8 @@ class ClipSummary:
             "visual_effect_count": self.visual_effect_count,
             "sfx_count": self.sfx_count,
             "source_signals": self.source_signals,
+            "gameplay_stats": self.gameplay_stats,
+            "duration_tier": self.duration_tier,
         }
 
 
@@ -132,6 +138,74 @@ class ClipSummaryEngine:
             primary_event = "gameplay highlight"
             secondary_events = []
 
+        # Parse concrete verified gameplay events (Phase 12A/12B/12C)
+        kills = 0
+        headshots = 0
+        aces = 0
+        clutches = 0
+        multi_kills = 0
+        round_wins = 0
+        spike_events = 0
+        total_events = 0
+
+        gameplay_events = candidate.get("gameplay_events", [])
+        for ev in gameplay_events:
+            ev_dict = ev if isinstance(ev, dict) else (ev.to_dict() if hasattr(ev, "to_dict") else vars(ev))
+            if ev_dict.get("status") == "supporting":
+                continue
+            ev_type = str(ev_dict.get("event_type", "")).lower()
+            meta = ev_dict.get("event_metadata", {}) or {}
+            total_events += 1
+
+            if ev_type in ("kill", "elimination"):
+                kills += 1
+                if meta.get("headshot") is True:
+                    headshots += 1
+            elif ev_type == "headshot":
+                headshots += 1
+                kills += 1
+            elif ev_type in ("ace", "ace_candidate"):
+                aces += 1
+            elif ev_type in ("clutch", "clutch_candidate"):
+                clutches += 1
+            elif ev_type == "multi_kill":
+                multi_kills += 1
+            elif ev_type == "round_win":
+                round_wins += 1
+            elif ev_type in ("spike_planted", "spike_defused", "spike_denied"):
+                spike_events += 1
+
+        gameplay_stats = {
+            "kills": kills,
+            "headshots": headshots,
+            "aces": aces,
+            "clutches": clutches,
+            "multi_kills": multi_kills,
+            "round_wins": round_wins,
+            "spike_events": spike_events,
+            "total_events": total_events,
+        }
+
+        # Upgrade primary_event if high-value gameplay events exist
+        if aces > 0:
+            primary_event = "ace"
+            if "ace" not in secondary_events:
+                secondary_events.insert(0, "ace")
+        elif clutches > 0:
+            primary_event = "clutch"
+            if "clutch" not in secondary_events:
+                secondary_events.insert(0, "clutch")
+        elif multi_kills > 0 or kills >= 3:
+            primary_event = "multi-kill"
+            if "multi-kill" not in secondary_events:
+                secondary_events.insert(0, "multi-kill")
+        elif headshots > 0 and primary_event in ("gameplay highlight", "reaction", "chaos"):
+            primary_event = "headshot"
+        elif kills > 0 and primary_event in ("gameplay highlight", "reaction", "chaos"):
+            primary_event = "kill"
+
+        duration_tier = candidate.get("duration_tier") or get_duration_tier(cand_dur)
+
         # 3. Extract Strongest Reaction
         strongest_reaction = "unknown"
         # Check phrase reactions first, then words
@@ -214,4 +288,6 @@ class ClipSummaryEngine:
             visual_effect_count=visual_count,
             sfx_count=sfx_count,
             source_signals=all_raw_signals,
+            gameplay_stats=gameplay_stats,
+            duration_tier=duration_tier,
         )

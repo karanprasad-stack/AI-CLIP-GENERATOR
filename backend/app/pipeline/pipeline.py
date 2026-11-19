@@ -51,6 +51,8 @@ from backend.app.config import (
     DEFAULT_ASPECT_RATIO,
     ASPECT_RATIO_1_1,
     get_output_dimensions,
+    get_duration_tier,
+    get_narrative_structure,
     LAYOUT_AUTO,
     CAPTION_FONT_NAME,
     CAPTION_FONT_SIZE,
@@ -445,6 +447,10 @@ def run_pipeline(
                     "short_clip": str(short_clip_file),
                     "layout": resolved_layout,
                     "aspect_ratio": aspect_ratio,
+                    "gameplay_events": cand.get("gameplay_events", []),
+                    "gameplay_sequences": cand.get("gameplay_sequences", []),
+                    "duration_tier": cand.get("duration_tier", get_duration_tier(cand_end - cand_start)),
+                    "narrative_structure": cand.get("narrative_structure", get_narrative_structure(cand.get("duration_tier", "standard"))),
                 }
 
                 try:
@@ -637,6 +643,7 @@ def run_pipeline(
                         clip_end=ext_end,
                         audio_peaks=audio_peaks,
                         clip_duration=ext_duration,
+                        gameplay_events=cand.get("gameplay_events", []),
                     )
 
                 # 3. Generate and write ASS subtitle file
