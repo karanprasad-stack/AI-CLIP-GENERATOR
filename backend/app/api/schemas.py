@@ -196,4 +196,66 @@ class ProjectSummaryResponse(BaseModel):
     updated_at: str
     candidates_count: int = 0
     shorts_count: int = 0
+
+
+# ==============================================================================
+# Phase 13 Social Media Publishing Schemas
+# ==============================================================================
+class PlatformConnectRequest(BaseModel):
+    auth_data: Optional[Dict[str, Any]] = None
+
+
+class PublishRequestSchema(BaseModel):
+    platform: str = "youtube"
+    title: str = Field(..., min_length=1, max_length=200)
+    description: Optional[str] = ""
+    hashtags: Optional[List[str]] = Field(default_factory=list)
+    privacy: str = Field(default="private", description="private, unlisted, public")
+    scheduled_publish_at: Optional[str] = None
+    upload_thumbnail: bool = True
+    dry_run: bool = False
+    aspect_ratio: str = "9:16"
+    extra_params: Optional[Dict[str, Any]] = None
+
+
+class PublishResultResponse(BaseModel):
+    success: bool
+    platform: str
+    status: str
+    remote_id: Optional[str] = None
+    remote_url: Optional[str] = None
+    message: str = ""
+    timestamp: str
+    dry_run: bool = False
+    details: Optional[Dict[str, Any]] = None
+
+
+class PlatformStatusResponse(BaseModel):
+    platform: str
+    display_name: str
+    connected: bool = False
+    configured: bool = False
+    sdk_installed: bool = True
+    account_name: Optional[str] = None
+    setup_hint: str = ""
+    supported_privacy: List[str] = Field(default_factory=lambda: ["private", "unlisted", "public"])
+    supports_scheduling: bool = True
+    supports_thumbnails: bool = True
+
+
+class PublishHistoryEntryResponse(BaseModel):
+    project_id: str
+    candidate_id: int
+    platform: str
+    status: str
+    success: bool
+    remote_id: Optional[str] = None
+    remote_url: Optional[str] = None
+    message: str = ""
+    timestamp: str
+    dry_run: bool = False
+    title: Optional[str] = None
+    privacy: Optional[str] = None
+    scheduled_publish_at: Optional[str] = None
+    upload_thumbnail: bool = True
     percent: int = 0

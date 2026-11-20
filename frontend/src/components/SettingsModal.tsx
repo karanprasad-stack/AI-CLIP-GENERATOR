@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
-import { X, Cpu, Sliders, Volume2, Subtitles, Settings } from 'lucide-react'
-import type { ProcessingSettings } from '../types'
+import React, { useState, useEffect } from 'react'
+import { X, Cpu, Sliders, Volume2, Subtitles, Settings, Share2, CheckCircle, AlertTriangle, RefreshCw, Key } from 'lucide-react'
+import type { ProcessingSettings, PlatformStatus } from '../types'
+import { fetchPublishingPlatforms, connectPlatform, disconnectPlatform } from '../api/client'
 
 interface SettingsModalProps {
   isOpen: boolean
@@ -9,7 +10,7 @@ interface SettingsModalProps {
   onSave: (settings: ProcessingSettings) => void
 }
 
-type TabType = 'general' | 'subtitles' | 'audio' | 'hardware'
+type TabType = 'general' | 'subtitles' | 'audio' | 'hardware' | 'publishing'
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
@@ -19,6 +20,56 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   const [localSettings, setLocalSettings] = useState<ProcessingSettings>(settings)
   const [activeTab, setActiveTab] = useState<TabType>('general')
+  const [platforms, setPlatforms] = useState<PlatformStatus[]>([])
+  const [isLoadingPlatforms, setIsLoadingPlatforms] = useState(false)
+  const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null)
+  const [platformActionMsg, setPlatformActionMsg] = useState<{ platform: string; text: string; error?: boolean } | null>(null)
+
+  useEffect(() => {
+    if (isOpen) {
+      loadPlatforms()
+    }
+  }, [isOpen])
+
+  const loadPlatforms = async () => {
+    setIsLoadingPlatforms(true)
+    try {
+      const data = await fetchPublishingPlatforms()
+      setPlatforms(data)
+    } catch {
+      // ignore
+    } finally {
+      setIsLoadingPlatforms(false)
+    }
+  }
+
+  const handleConnect = async (platformName: string) => {
+    setConnectingPlatform(platformName)
+    setPlatformActionMsg(null)
+    try {
+      await connectPlatform(platformName)
+      setPlatformActionMsg({ platform: platformName, text: 'Connected successfully!' })
+      await loadPlatforms()
+    } catch (err: any) {
+      setPlatformActionMsg({ platform: platformName, text: err.message || 'Connection failed.', error: true })
+    } finally {
+      setConnectingPlatform(null)
+    }
+  }
+
+  const handleDisconnect = async (platformName: string) => {
+    setConnectingPlatform(platformName)
+    setPlatformActionMsg(null)
+    try {
+      await disconnectPlatform(platformName)
+      setPlatformActionMsg({ platform: platformName, text: 'Disconnected.' })
+      await loadPlatforms()
+    } catch (err: any) {
+      setPlatformActionMsg({ platform: platformName, text: err.message || 'Disconnect failed.', error: true })
+    } finally {
+      setConnectingPlatform(null)
+    }
+  }
 
   if (!isOpen) return null
 
@@ -95,6 +146,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           >
             <Cpu size={14} />
             <span>GPU / NVENC</span>
+          </button>
+          <button
+            className={`btn ${activeTab === 'publishing' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => {
+              setActiveTab('publishing')
+              loadPlatforms()
+            }}
+            style={{ padding: '6px 14px', fontSize: '0.85rem' }}
+          >
+            <Share2 size={14} />
+            <span>Publishing Accounts</span>
           </button>
         </div>
 
@@ -345,6 +407,147 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <span style={{ color: 'var(--text-muted)' }}>External Cloud API Cost:</span>
                 <span style={{ fontWeight: 700, color: 'var(--accent-green)' }}>$0.00 (100% Free / Local-First)</span>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 5: Publishing Accounts */}
+        {activeTab === 'publishing' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>Social Media Publishing Layer (Phase 13)</h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)', margin: '4px 0 0 0' }}>
+                  Local-first, modular social upload adapters. Credentials are kept strictly in your local <code>config/credentials/</code> folder.
+                </p>
+              </div>
+              <button
+                className="btn btn-secondary"
+                onClick={loadPlatforms}
+                disabled={isLoadingPlatforms}
+                style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 6 }}
+              >
+                <RefreshCw size={13} className={isLoadingPlatforms ? 'animate-spin' : ''} />
+                <span>Refresh Status</span>
+              </button>
+            </div>
+
+            {platformActionMsg && (
+              <div style={{
+                padding: '8px 12px',
+                borderRadius: 6,
+                fontSize: '0.8rem',
+                background: platformActionMsg.error ? 'rgba(239, 68, 68, 0.15)' : 'rgba(34, 197, 94, 0.15)',
+                border: `1px solid ${platformActionMsg.error ? '#f87171' : 'var(--accent-green)'}`,
+                color: platformActionMsg.error ? '#f87171' : 'var(--accent-green)',
+              }}>
+                {platformActionMsg.text}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {platforms.map((p) => {
+                const isConnecting = connectingPlatform === p.platform
+
+                return (
+                  <div
+                    key={p.platform}
+                    style={{
+                      background: 'rgba(15, 23, 42, 0.7)',
+                      borderRadius: 8,
+                      border: '1px solid var(--border-color)',
+                      padding: '16px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 10,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 6,
+                          background: p.platform === 'youtube' ? 'rgba(239, 68, 68, 0.15)' : (p.platform === 'tiktok' ? 'rgba(34, 211, 238, 0.15)' : 'rgba(236, 72, 153, 0.15)'),
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: p.platform === 'youtube' ? '#f87171' : (p.platform === 'tiktok' ? 'var(--accent-cyan)' : '#f472b6'),
+                          fontWeight: 700,
+                          fontSize: '0.85rem',
+                        }}>
+                          {p.platform === 'youtube' ? 'YT' : (p.platform === 'tiktok' ? 'TT' : 'IG')}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--text-main)' }}>
+                            {p.display_name}
+                          </div>
+                          <div style={{ fontSize: '0.74rem', color: 'var(--text-dim)' }}>
+                            Privacy: {p.supported_privacy.join(', ')} • Scheduling: {p.supports_scheduling ? 'Supported' : 'Immediate only'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Status Badge */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {p.connected ? (
+                          <span className="badge badge-green" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem' }}>
+                            <CheckCircle size={12} /> Connected: {p.account_name}
+                          </span>
+                        ) : !p.sdk_installed ? (
+                          <span className="badge badge-amber" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem' }}>
+                            <AlertTriangle size={12} /> SDK Missing
+                          </span>
+                        ) : p.configured ? (
+                          <span className="badge badge-cyan" style={{ fontSize: '0.75rem' }}>
+                            Configured (Not Signed In)
+                          </span>
+                        ) : (
+                          <span className="badge" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-dim)', fontSize: '0.75rem' }}>
+                            Not Configured
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Hint / Setup Information */}
+                    <div style={{
+                      fontSize: '0.78rem',
+                      color: p.connected ? 'var(--text-main)' : 'var(--text-muted)',
+                      background: 'rgba(0, 0, 0, 0.25)',
+                      padding: '8px 12px',
+                      borderRadius: 6,
+                      borderLeft: `3px solid ${p.connected ? 'var(--accent-green)' : (p.configured ? 'var(--accent-cyan)' : 'var(--text-dim)')}`,
+                    }}>
+                      {p.setup_hint}
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                      {p.connected ? (
+                        <button
+                          className="btn btn-secondary"
+                          onClick={() => handleDisconnect(p.platform)}
+                          disabled={isConnecting}
+                          style={{ fontSize: '0.78rem', padding: '4px 10px', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+                        >
+                          Disconnect Account
+                        </button>
+                      ) : p.platform === 'youtube' && p.configured && p.sdk_installed ? (
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => handleConnect(p.platform)}
+                          disabled={isConnecting}
+                          style={{ fontSize: '0.78rem', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: 6 }}
+                        >
+                          <Key size={13} />
+                          <span>{isConnecting ? 'Authorizing...' : 'Connect via Google OAuth'}</span>
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}

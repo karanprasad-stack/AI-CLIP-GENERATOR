@@ -36,6 +36,11 @@ htmlcov/
 .env
 .env.local
 
+# Local OAuth Credentials & Tokens (Phase 13 Publishing)
+config/credentials/
+*client_secret*.json
+*_token.json
+
 # Operating System & IDE
 .DS_Store
 Thumbs.db

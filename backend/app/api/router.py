@@ -19,6 +19,16 @@ from backend.app.api.schemas import (
     MetadataUpdateRequest,
     ProjectDetailResponse,
     ProjectSummaryResponse,
+    PlatformConnectRequest,
+    PublishRequestSchema,
+    PublishResultResponse,
+    PlatformStatusResponse,
+    PublishHistoryEntryResponse,
+)
+from backend.app.pipeline.publishing import (
+    PublisherRegistry,
+    PublishHistoryStore,
+    PublishRequest,
 )
 from backend.app.services.project_manager import ProjectManager
 from backend.app.services.job_runner import run_analysis_task, run_render_task
@@ -26,6 +36,8 @@ from backend.app.services.health import HealthChecker
 
 router = APIRouter(prefix="/api")
 project_manager = ProjectManager()
+publisher_registry = PublisherRegistry()
+publish_history_store = PublishHistoryStore(base_output_dir=project_manager.output_dir)
 
 PROJECT_ID_REGEX = re.compile(r"^[a-zA-Z0-9_\-]+$")
 
@@ -611,4 +623,121 @@ def get_live_stream_activity(project_id: str):
         return {"events": project_manager.get_live_activity(project_id)}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ==============================================================================
+# Phase 13 Social Media Publishing Endpoints
+# ==============================================================================
+
+@router.get("/publishing/platforms", response_model=List[PlatformStatusResponse])
+def get_publishing_platforms():
+    """Returns status, connection readiness, and setup hints for all supported publishing platforms."""
+    statuses = publisher_registry.list_platform_statuses()
+    return [s.model_dump() if hasattr(s, "model_dump") else s.dict() for s in statuses]
+
+
+@router.post("/publishing/{platform}/connect")
+def connect_platform(platform: str, req: Optional[PlatformConnectRequest] = None):
+    """Initiates or completes OAuth authentication for a publishing platform."""
+    try:
+        publisher = publisher_registry.get_publisher(platform)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    try:
+        auth_data = req.auth_data if req else None
+        res = publisher.connect(auth_data=auth_data)
+        return res
+    except (RuntimeError, FileNotFoundError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Connection failed: {str(e)}")
+
+
+@router.post("/publishing/{platform}/disconnect")
+def disconnect_platform(platform: str):
+    """Disconnects and safely clears local credentials for a publishing platform."""
+    try:
+        publisher = publisher_registry.get_publisher(platform)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    ok = publisher.disconnect()
+    return {"success": ok, "platform": platform, "status": "disconnected"}
+
+
+@router.post("/projects/{project_id}/candidates/{candidate_id}/publish", response_model=PublishResultResponse)
+def publish_candidate(project_id: str, candidate_id: int, req: PublishRequestSchema):
+    """Publishes a rendered candidate Short (or runs a dry-run payload simulation) to target platform."""
+    validate_pid(project_id)
+    proj = project_manager.get_project(project_id)
+    if not proj:
+        raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Project not found")
+
+    try:
+        publisher = publisher_registry.get_publisher(req.platform)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    output_dir = project_manager.output_dir / project_id
+    package_dir = output_dir / "publishing" / f"candidate_{candidate_id:02d}"
+    video_path = package_dir / "final.mp4"
+    thumbnail_path = package_dir / "thumbnail.jpg"
+
+    # Fallback paths if final.mp4 is not in package_dir
+    if not video_path.exists():
+        clip_path = output_dir / "clips" / f"candidate_{candidate_id:02d}_final.mp4"
+        if clip_path.exists():
+            video_path = clip_path
+        else:
+            cand = next((c for c in proj.get("candidates", []) if (c.get("rank") == candidate_id or c.get("candidate_id") == candidate_id)), None)
+            if cand:
+                clip_prop = cand.get("audio_polished_clip") or cand.get("final_clip") or cand.get("short_clip")
+                if clip_prop and Path(clip_prop).exists():
+                    video_path = Path(clip_prop)
+
+    if not thumbnail_path.exists():
+        clip_thumb = output_dir / "clips" / f"candidate_{candidate_id:02d}_thumb.jpg"
+        if clip_thumb.exists():
+            thumbnail_path = clip_thumb
+
+    pub_req = PublishRequest(
+        project_id=project_id,
+        candidate_id=candidate_id,
+        platform=req.platform,
+        title=req.title,
+        description=req.description,
+        hashtags=req.hashtags,
+        privacy=req.privacy,
+        scheduled_publish_at=req.scheduled_publish_at,
+        upload_thumbnail=req.upload_thumbnail,
+        dry_run=req.dry_run,
+        aspect_ratio=req.aspect_ratio,
+        extra_params=req.extra_params,
+    )
+
+    result = publisher.publish(
+        video_path=video_path,
+        thumbnail_path=thumbnail_path if thumbnail_path.exists() else None,
+        req=pub_req,
+    )
+
+    publish_history_store.record_publish(project_id=project_id, result=result, req=pub_req)
+    return result
+
+
+@router.get("/projects/{project_id}/publish-history", response_model=List[PublishHistoryEntryResponse])
+def get_project_publish_history(project_id: str):
+    """Returns all publishing attempts and simulation history for the project."""
+    validate_pid(project_id)
+    proj = project_manager.get_project(project_id)
+    if not proj:
+        raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Project not found")
+    return publish_history_store.get_history(project_id)
+
+
+@router.get("/projects/{project_id}/candidates/{candidate_id}/publish-history", response_model=List[PublishHistoryEntryResponse])
+def get_candidate_publish_history(project_id: str, candidate_id: int):
+    """Returns publishing history for a specific candidate."""
+    validate_pid(project_id)
+    return publish_history_store.get_candidate_history(project_id, candidate_id)
+
 

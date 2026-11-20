@@ -1,8 +1,16 @@
-import React, { useState } from 'react'
-import { Download, RefreshCw, Check, Film, Image as ImageIcon, FileText, ArrowLeft, Tag, Key, AlertTriangle, ShieldCheck, Sliders, Copy, Sparkles } from 'lucide-react'
-import type { ProjectDetail } from '../types'
-import { getFileUrl, getPackageDownloadUrl, updateMetadata, regenerateMetadata, getOutputDetail } from '../api/client'
+import React, { useState, useEffect } from 'react'
+import {
+  Download, RefreshCw, Check, Film, Image as ImageIcon, FileText, ArrowLeft,
+  Tag, Key, AlertTriangle, ShieldCheck, Sliders, Copy, Sparkles, UploadCloud,
+  ExternalLink, CheckCircle2, History
+} from 'lucide-react'
+import type { ProjectDetail, PlatformStatus, PublishResult, PublishHistoryEntry } from '../types'
+import {
+  getFileUrl, getPackageDownloadUrl, updateMetadata, regenerateMetadata, getOutputDetail,
+  fetchPublishingPlatforms, publishCandidate, fetchCandidatePublishHistory
+} from '../api/client'
 import { TimelineEditor } from './TimelineEditor/TimelineEditor'
+import { ConfirmDialog } from './ui/ConfirmDialog'
 
 interface PublishingReviewProps {
   project: ProjectDetail
@@ -33,6 +41,98 @@ export const PublishingReview: React.FC<PublishingReviewProps> = ({
   const [isTimelineOpen, setIsTimelineOpen] = useState(false)
   const [copiedDesc, setCopiedDesc] = useState(false)
 
+  // Publishing states (Phase 13)
+  const [platforms, setPlatforms] = useState<PlatformStatus[]>([])
+  const [selectedPlatform, setSelectedPlatform] = useState<string>('youtube')
+  const [publishPrivacy, setPublishPrivacy] = useState<string>('private')
+  const [scheduledAt, setScheduledAt] = useState<string>('')
+  const [isDryRun, setIsDryRun] = useState<boolean>(true)
+  const [isPublishing, setIsPublishing] = useState<boolean>(false)
+  const [publishResult, setPublishResult] = useState<PublishResult | null>(null)
+  const [publishHistory, setPublishHistory] = useState<PublishHistoryEntry[]>([])
+  const [isConfirmOpen, setIsConfirmOpen] = useState<boolean>(false)
+  const [confirmTitle, setConfirmTitle] = useState<string>('')
+  const [confirmMsg, setConfirmMsg] = useState<string>('')
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null)
+
+  useEffect(() => {
+    fetchPublishingPlatforms()
+      .then((data) => {
+        setPlatforms(data)
+        const yt = data.find((p) => p.platform === 'youtube')
+        if (yt && !yt.connected) {
+          setIsDryRun(true)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  const loadHistory = (cid: number) => {
+    fetchCandidatePublishHistory(project.id, cid)
+      .then((hist) => setPublishHistory(hist))
+      .catch(() => {})
+  }
+
+  const handlePublishClick = () => {
+    if (!activePackage) return
+
+    // 1. Check if public upload
+    if (!isDryRun && publishPrivacy === 'public') {
+      setConfirmTitle('Confirm Public Upload')
+      setConfirmMsg(`You are about to publish Short #${activePackage.candidate_id} as PUBLIC on ${selectedPlatform.toUpperCase()}. It will immediately be visible to your audience. Proceed?`)
+      setPendingAction(() => executePublish)
+      setIsConfirmOpen(true)
+      return
+    }
+
+    // 2. Check if already published
+    const already = publishHistory.some(
+      (h) => h.platform === selectedPlatform && h.success && !h.dry_run && (h.status === 'published' || h.status === 'scheduled')
+    )
+    if (!isDryRun && already) {
+      setConfirmTitle('Duplicate Upload Warning')
+      setConfirmMsg(`Short #${activePackage.candidate_id} has already been published to ${selectedPlatform.toUpperCase()}. Do you want to re-upload it?`)
+      setPendingAction(() => executePublish)
+      setIsConfirmOpen(true)
+      return
+    }
+
+    executePublish()
+  }
+
+  const executePublish = async () => {
+    if (!activePackage) return
+    setIsPublishing(true)
+    setPublishResult(null)
+    try {
+      const isSquareVid = (activePackage as any)?.aspect_ratio === '1:1' || project.settings?.aspect_ratio === '1:1'
+      const res = await publishCandidate(project.id, activePackage.candidate_id, {
+        platform: selectedPlatform,
+        title,
+        description,
+        hashtags,
+        privacy: publishPrivacy,
+        scheduled_publish_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+        upload_thumbnail: true,
+        dry_run: isDryRun,
+        aspect_ratio: isSquareVid ? '1:1' : '9:16',
+      })
+      setPublishResult(res)
+      loadHistory(activePackage.candidate_id)
+    } catch (err: any) {
+      setPublishResult({
+        success: false,
+        platform: selectedPlatform,
+        status: 'failed',
+        message: err.message || 'Publishing failed.',
+        timestamp: new Date().toISOString(),
+        dry_run: isDryRun,
+      })
+    } finally {
+      setIsPublishing(false)
+    }
+  }
+
   // Sync when active candidate tab changes
   React.useEffect(() => {
     if (activePackage) {
@@ -42,6 +142,8 @@ export const PublishingReview: React.FC<PublishingReviewProps> = ({
       setKeywords(activePackage.keywords || [])
       setSaveSuccess(false)
       setTitleAlternatives([])
+      loadHistory(activePackage.candidate_id)
+      setPublishResult(null)
 
       // Fetch package details for alternative titles, full description, and tags
       getOutputDetail(project.id, activePackage.candidate_id)
@@ -636,8 +738,251 @@ export const PublishingReview: React.FC<PublishingReviewProps> = ({
               </button>
             </div>
           </div>
+
+          {/* Direct Social Publish Card (Phase 13) */}
+          <div className="card card-glow" style={{ padding: 18, marginTop: 12, border: '1px solid rgba(34, 211, 238, 0.25)', background: 'linear-gradient(180deg, rgba(15, 23, 42, 0.8) 0%, rgba(13, 19, 34, 0.95) 100%)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <UploadCloud size={18} color="var(--accent-cyan)" />
+                <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>Direct Social Publish (Phase 13)</h3>
+              </div>
+              <span className="badge badge-purple" style={{ fontSize: '0.72rem' }}>Local-First Studio Layer</span>
+            </div>
+
+            {/* Platform Selection Pills */}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+              {['youtube', 'tiktok', 'instagram'].map((plat) => {
+                const isSel = selectedPlatform === plat
+                const pInfo = platforms.find((p) => p.platform === plat)
+                const isConn = pInfo?.connected || false
+                const label = plat === 'youtube' ? 'YouTube Shorts' : (plat === 'tiktok' ? 'TikTok' : 'Instagram Reels')
+
+                return (
+                  <button
+                    key={plat}
+                    type="button"
+                    onClick={() => {
+                      setSelectedPlatform(plat)
+                      if (!isConn) setIsDryRun(true)
+                    }}
+                    className={`btn ${isSel ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{
+                      padding: '7px 14px',
+                      fontSize: '0.82rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      borderColor: isSel ? undefined : (isConn ? 'rgba(34, 197, 94, 0.3)' : undefined),
+                    }}
+                  >
+                    <span style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      background: isConn ? 'var(--accent-green)' : (pInfo?.configured ? 'var(--accent-cyan)' : 'var(--text-dim)'),
+                      boxShadow: isConn ? '0 0 8px var(--accent-green)' : undefined,
+                      display: 'inline-block',
+                    }} />
+                    <span>{label}</span>
+                    {isConn && <span style={{ fontSize: '0.7rem', color: 'var(--accent-green)' }}>✓</span>}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Settings Row: Privacy & Scheduling */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-dim)', marginBottom: 6 }}>
+                  Upload Privacy Level
+                </label>
+                <select
+                  className="select"
+                  value={publishPrivacy}
+                  onChange={(e) => setPublishPrivacy(e.target.value)}
+                  style={{ width: '100%', fontSize: '0.82rem', padding: '7px 10px' }}
+                >
+                  <option value="private">Private (Default / Safe)</option>
+                  <option value="unlisted">Unlisted (Share via Link)</option>
+                  <option value="public">Public (Immediately Visible)</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-dim)', marginBottom: 6 }}>
+                  Schedule Date/Time (Optional)
+                </label>
+                <input
+                  type="datetime-local"
+                  className="input-text"
+                  value={scheduledAt}
+                  onChange={(e) => setScheduledAt(e.target.value)}
+                  style={{ width: '100%', fontSize: '0.82rem', padding: '6px 10px' }}
+                />
+              </div>
+            </div>
+
+            {/* Dry Run Checkbox Toggle */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '10px 12px',
+              borderRadius: 6,
+              background: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid var(--border-color)',
+              marginBottom: 14,
+            }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
+                <input
+                  type="checkbox"
+                  checked={isDryRun}
+                  onChange={(e) => setIsDryRun(e.target.checked)}
+                />
+                <span>Simulate Upload (Dry Run Mode)</span>
+              </label>
+              <span style={{ fontSize: '0.74rem', color: 'var(--text-dim)' }}>
+                {isDryRun ? 'No live network upload. Validates payload & package.' : 'Live network upload to platform.'}
+              </span>
+            </div>
+
+            {/* Publish Trigger Button */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+              <button
+                className={`btn ${isDryRun ? 'btn-secondary' : 'btn-primary'}`}
+                onClick={handlePublishClick}
+                disabled={isPublishing}
+                style={{
+                  flex: 1,
+                  padding: '10px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  fontWeight: 700,
+                  fontSize: '0.88rem',
+                }}
+              >
+                <UploadCloud size={16} />
+                <span>
+                  {isPublishing
+                    ? 'Publishing in Progress...'
+                    : (isDryRun
+                      ? `Simulate ${selectedPlatform === 'youtube' ? 'YouTube Shorts' : (selectedPlatform === 'tiktok' ? 'TikTok' : 'Instagram Reels')} Upload`
+                      : `Publish Short #${activePackage.candidate_id} to ${selectedPlatform === 'youtube' ? 'YouTube Shorts' : (selectedPlatform === 'tiktok' ? 'TikTok' : 'Instagram Reels')}`
+                    )}
+                </span>
+              </button>
+            </div>
+
+            {/* Publish Execution Result Alert Banner */}
+            {publishResult && (
+              <div style={{
+                marginTop: 14,
+                padding: '12px 14px',
+                borderRadius: 6,
+                fontSize: '0.82rem',
+                background: publishResult.success ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                border: `1px solid ${publishResult.success ? 'var(--accent-green)' : '#f87171'}`,
+                color: publishResult.success ? 'var(--text-main)' : '#f87171',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+                    {publishResult.success ? <CheckCircle2 size={15} color="var(--accent-green)" /> : <AlertTriangle size={15} color="#f87171" />}
+                    <span>{publishResult.status.toUpperCase()}: {publishResult.message}</span>
+                  </div>
+                  {publishResult.remote_url && (
+                    <a
+                      href={publishResult.remote_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-secondary"
+                      style={{ padding: '3px 8px', fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: 4 }}
+                    >
+                      <ExternalLink size={12} />
+                      <span>Open Link</span>
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Candidate Publish History */}
+            {publishHistory.length > 0 && (
+              <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-dim)', marginBottom: 8 }}>
+                  <History size={13} />
+                  <span>Publish History for Short #{activePackage.candidate_id} ({publishHistory.length})</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {publishHistory.map((h, hIdx) => (
+                    <div
+                      key={hIdx}
+                      style={{
+                        padding: '6px 10px',
+                        borderRadius: 4,
+                        background: 'rgba(0,0,0,0.3)',
+                        border: '1px solid rgba(255,255,255,0.04)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        fontSize: '0.74rem',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span className="badge badge-cyan" style={{ fontSize: '0.68rem', padding: '1px 5px' }}>
+                          {h.platform.toUpperCase()}
+                        </span>
+                        <span className={`badge ${h.status === 'published' ? 'badge-green' : (h.status === 'dry_run' ? 'badge-purple' : 'badge-amber')}`} style={{ fontSize: '0.68rem', padding: '1px 5px' }}>
+                          {h.status.toUpperCase()}
+                        </span>
+                        <span style={{ color: 'var(--text-dim)' }}>
+                          {new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </span>
+                      </div>
+                      {h.remote_url && (
+                        <a
+                          href={h.remote_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}
+                        >
+                          <span>{h.remote_id}</span>
+                          <ExternalLink size={10} />
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Confirmation Dialog for Public or Duplicate Uploads */}
+      <ConfirmDialog
+        isOpen={isConfirmOpen}
+        title={confirmTitle}
+        message={confirmMsg}
+        confirmText="Proceed"
+        cancelText="Cancel"
+        isDestructive={confirmTitle.includes('Public')}
+        onConfirm={() => {
+          setIsConfirmOpen(false)
+          if (pendingAction) {
+            pendingAction()
+            setPendingAction(null)
+          }
+        }}
+        onCancel={() => {
+          setIsConfirmOpen(false)
+          setPendingAction(null)
+        }}
+      />
 
       {/* Phase 8 Multi-Track Timeline Editor Overlay */}
       {isTimelineOpen && activePackage && (

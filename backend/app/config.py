@@ -692,3 +692,18 @@ LIVE_RECONNECT_INITIAL_DELAY_SEC: float = 2.0
 LIVE_RECONNECT_BACKOFF_FACTOR: float = 2.0
 LIVE_RECONNECT_MAX_DELAY_SEC: float = 30.0
 
+# ==============================================================================
+# Phase 13 Configuration — Modular Social Media Publishing Layer
+# ==============================================================================
+CREDENTIALS_DIR: Path = PROJECT_ROOT / "config" / "credentials"
+YOUTUBE_CLIENT_SECRETS_FILE: Path = CREDENTIALS_DIR / "youtube_client_secrets.json"
+YOUTUBE_TOKEN_FILE: Path = CREDENTIALS_DIR / "youtube_token.json"
+TIKTOK_TOKEN_FILE: Path = CREDENTIALS_DIR / "tiktok_token.json"
+INSTAGRAM_TOKEN_FILE: Path = CREDENTIALS_DIR / "instagram_token.json"
+
+DEFAULT_PUBLISH_PRIVACY: str = "private"
+YOUTUBE_DEFAULT_CATEGORY_ID: str = "20"  # Gaming
+MAX_YOUTUBE_SHORTS_TITLE_LEN: int = 100
+MAX_TIKTOK_CAPTION_LEN: int = 2200
+MAX_INSTAGRAM_CAPTION_LEN: int = 2200
+

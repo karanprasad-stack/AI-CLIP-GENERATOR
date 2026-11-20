@@ -1,4 +1,12 @@
-import type { ProjectSummary, ProjectDetail, ProcessingSettings } from '../types'
+import type {
+  ProjectSummary,
+  ProjectDetail,
+  ProcessingSettings,
+  PlatformStatus,
+  PublishRequest,
+  PublishResult,
+  PublishHistoryEntry,
+} from '../types'
 
 const API_BASE = '/api'
 
@@ -219,4 +227,63 @@ export async function fetchLiveActivity(id: string): Promise<any[]> {
   if (!res.ok) throw new Error('Failed to fetch live activity')
   const data = await res.json()
   return data.events || []
+}
+
+export async function fetchPublishingPlatforms(): Promise<PlatformStatus[]> {
+  const res = await fetch(`${API_BASE}/publishing/platforms`)
+  if (!res.ok) throw new Error('Failed to fetch publishing platforms')
+  return res.json()
+}
+
+export async function connectPlatform(platform: string, authData?: any): Promise<any> {
+  const res = await fetch(`${API_BASE}/publishing/${platform}/connect`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: authData ? JSON.stringify({ auth_data: authData }) : undefined,
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to connect platform' }))
+    throw new Error(err.detail || 'Failed to connect platform')
+  }
+  return res.json()
+}
+
+export async function disconnectPlatform(platform: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/publishing/${platform}/disconnect`, {
+    method: 'POST',
+  })
+  if (!res.ok) throw new Error('Failed to disconnect platform')
+  return res.json()
+}
+
+export async function publishCandidate(
+  projectId: string,
+  candidateId: number,
+  req: PublishRequest
+): Promise<PublishResult> {
+  const res = await fetch(`${API_BASE}/projects/${projectId}/candidates/${candidateId}/publish`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Publish failed' }))
+    throw new Error(err.detail || 'Publish failed')
+  }
+  return res.json()
+}
+
+export async function fetchPublishHistory(projectId: string): Promise<PublishHistoryEntry[]> {
+  const res = await fetch(`${API_BASE}/projects/${projectId}/publish-history`)
+  if (!res.ok) throw new Error('Failed to fetch publish history')
+  return res.json()
+}
+
+export async function fetchCandidatePublishHistory(
+  projectId: string,
+  candidateId: number
+): Promise<PublishHistoryEntry[]> {
+  const res = await fetch(`${API_BASE}/projects/${projectId}/candidates/${candidateId}/publish-history`)
+  if (!res.ok) throw new Error('Failed to fetch candidate publish history')
+  return res.json()
 }

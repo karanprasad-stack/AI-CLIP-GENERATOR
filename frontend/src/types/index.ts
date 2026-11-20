@@ -353,3 +353,58 @@ export interface ProjectSummary {
 
 export type CandidateSortOption = 'score' | 'duration' | 'rank' | 'publishability'
 export type CandidateFilterOption = 'all' | 'selected' | 'publish' | 'review' | 'reject' | 'strong' | 'funny' | 'combat' | 'timing'
+
+export interface PlatformStatus {
+  platform: string
+  display_name: string
+  connected: boolean
+  configured: boolean
+  sdk_installed: boolean
+  account_name?: string | null
+  setup_hint: string
+  supported_privacy: string[]
+  supports_scheduling: boolean
+  supports_thumbnails: boolean
+}
+
+export interface PublishRequest {
+  platform: string
+  title: string
+  description?: string
+  hashtags?: string[]
+  privacy?: string
+  scheduled_publish_at?: string | null
+  upload_thumbnail?: boolean
+  dry_run?: boolean
+  aspect_ratio?: string
+  extra_params?: Record<string, any>
+}
+
+export interface PublishResult {
+  success: boolean
+  platform: string
+  status: 'published' | 'scheduled' | 'dry_run' | 'failed'
+  remote_id?: string | null
+  remote_url?: string | null
+  message: string
+  timestamp: string
+  dry_run: boolean
+  details?: Record<string, any> | null
+}
+
+export interface PublishHistoryEntry {
+  project_id: string
+  candidate_id: number
+  platform: string
+  status: string
+  success: boolean
+  remote_id?: string | null
+  remote_url?: string | null
+  message: string
+  timestamp: string
+  dry_run: boolean
+  title?: string
+  privacy?: string
+  scheduled_publish_at?: string | null
+  upload_thumbnail?: boolean
+}

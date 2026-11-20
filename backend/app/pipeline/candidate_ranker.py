@@ -110,6 +110,7 @@ class CandidateRanker:
         kill_events = []
         headshot_count = 0
         spectated_kills_count = 0
+        ambient_kills_count = 0
 
         for ev in qualifying_events:
             etype = getattr(ev, "event_type", "")
@@ -168,13 +169,21 @@ class CandidateRanker:
                 kill_events.append(ev)
                 if meta.get("headshot", False):
                     headshot_count += 1
-                if (
-                    meta.get("is_spectated_player", False)
-                    or meta.get("is_local_player", False)
+                
+                is_ambient = (
+                    meta.get("ambient") is True
+                    or meta.get("is_spectated_player") is False
+                    or meta.get("killer") in {"teammate", "enemy", "other", "ambient"}
+                ) and not (
+                    meta.get("hud_skull_corroborated", False)
+                    or meta.get("is_spectated_player") is True
+                    or meta.get("is_local_player") is True
                     or meta.get("killer") in {"spectated_player", "local_player"}
-                    or meta.get("hud_skull_corroborated", False)
-                    or getattr(ev, "evidence", {}).get("hud_skull")
-                ):
+                )
+
+                if is_ambient:
+                    ambient_kills_count += 1
+                else:
                     spectated_kills_count += 1
 
             if etype == "headshot":
@@ -837,10 +846,16 @@ class CandidateRanker:
             )
 
             # Check for stream meta-chatter / lobby filler phrases (e.g. donations/queueing without concrete gameplay)
-            window_text = " ".join(
-                w["word"].lower() for w in transcript_analyzer.words
-                if start_sec <= w["start"] <= end_sec
-            )
+            if transcript_analyzer.words:
+                window_text = " ".join(
+                    w["word"].lower() for w in transcript_analyzer.words
+                    if start_sec <= w["start"] <= end_sec
+                )
+            else:
+                window_text = " ".join(
+                    s.get("text", "").lower() for s in transcript_analyzer.segments
+                    if not (s.get("end", 0.0) < start_sec or s.get("start", 0.0) > end_sec)
+                )
             meta_chatter_hits = [phrase for phrase in META_CHATTER_PHRASES if phrase in window_text]
             has_concrete_events = (
                 event_breakdown.get("concrete_gameplay_events", {}).get("score", 0.0) > 0.0
@@ -851,7 +866,7 @@ class CandidateRanker:
                 event_score = max(5.0, round(event_score * 0.40, 1))
                 context_score = max(10.0, round(context_score * 0.50, 1))
                 context_penalties.append("penalized: stream meta-chatter / non-gameplay segment")
-                event_reasons.append(f"penalized for stream meta-chatter ({len(meta_chatter_hits)} hits: {', '.join(meta_chatter_hits[:2])})")
+                event_reasons.insert(0, f"penalized for stream meta-chatter ({len(meta_chatter_hits)} hits: {', '.join(meta_chatter_hits[:2])})")
 
             # Calculate composite score using normalized active weights
             w = active_weights
