@@ -22,6 +22,8 @@ class TimelineVideoTrack(BaseModel):
     aspect_ratio: str = "9:16"
     fps: int = 60
     enabled: bool = True
+    kill_feed_overlay: bool = False
+    kill_feed_roi: Optional[List[float]] = None
 
 
 class SubtitleWordItem(BaseModel):

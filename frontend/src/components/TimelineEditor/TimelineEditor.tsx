@@ -646,7 +646,7 @@ export const TimelineEditor: React.FC<TimelineEditorProps> = ({
             <div style={{ display: 'flex', borderBottom: '1px solid #1e293b', minHeight: 38, alignItems: 'center' }}>
               <div style={{ width: 140, paddingLeft: 12, fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Film size={13} color="var(--accent-cyan)" />
-                <span>Video 9:16</span>
+                <span>{timeline.video_track.aspect_ratio === '1:1' ? 'Video 1:1' : 'Video 9:16'}</span>
               </div>
               <div style={{ position: 'relative', flex: 1, height: 26, background: '#111827', borderRadius: 4 }}>
                 <div style={{
@@ -660,10 +660,40 @@ export const TimelineEditor: React.FC<TimelineEditorProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   paddingLeft: 8,
+                  paddingRight: 8,
                   fontSize: '0.7rem',
                   color: 'var(--accent-cyan)',
+                  justifyContent: 'space-between',
                 }}>
-                  {timeline.video_track.layout} • {timeline.video_track.resolution} • {timeline.video_track.fps}fps
+                  <span>{timeline.video_track.layout} • {timeline.video_track.resolution} • {timeline.video_track.fps}fps</span>
+                  {timeline.video_track.aspect_ratio !== '1:1' && (
+                    <button
+                      type="button"
+                      style={{
+                        background: timeline.video_track.kill_feed_overlay ? 'rgba(0, 242, 254, 0.25)' : 'rgba(255, 255, 255, 0.08)',
+                        border: timeline.video_track.kill_feed_overlay ? '1px solid var(--accent-cyan)' : '1px solid rgba(255, 255, 255, 0.2)',
+                        color: timeline.video_track.kill_feed_overlay ? 'var(--accent-cyan)' : 'var(--text-dim)',
+                        borderRadius: 3,
+                        padding: '1px 6px',
+                        fontSize: '0.65rem',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                      }}
+                      onClick={() => {
+                        const updated = {
+                          ...timeline,
+                          video_track: {
+                            ...timeline.video_track,
+                            kill_feed_overlay: !timeline.video_track.kill_feed_overlay,
+                          },
+                        }
+                        commitTimelineChange(updated, 'video')
+                      }}
+                      title="Toggle Kill-Feed PIP Overlay for 9:16 Shorts"
+                    >
+                      PIP {timeline.video_track.kill_feed_overlay ? 'ON' : 'OFF'}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

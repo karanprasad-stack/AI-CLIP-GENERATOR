@@ -19,6 +19,7 @@ export interface ProcessingSettings {
   llm: boolean
   quality_preset: 'Standard' | 'High' | 'Very High' | 'Custom'
   aspect_ratio?: '9:16' | '1:1'
+  kill_feed_overlay?: 'auto' | 'on' | 'off'
   game_mode?: 'auto' | 'valorant' | 'competitive_fps' | 'story_open_world' | 'horror_survival' | 'generic'
   resolution: string
   fps: number
@@ -50,6 +51,8 @@ export interface TimelineVideoTrack {
   aspect_ratio?: string
   fps: number
   enabled: boolean
+  kill_feed_overlay?: boolean
+  kill_feed_roi?: [number, number, number, number] | number[] | null
 }
 
 export interface SubtitleWordItem {

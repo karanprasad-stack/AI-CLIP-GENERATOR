@@ -462,6 +462,30 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
                   </select>
                 </div>
 
+                {/* Kill-Feed PIP Overlay for 9:16 */}
+                {settings.aspect_ratio !== '1:1' && (
+                  <div style={{ gridColumn: 'span 2', background: 'rgba(255,255,255,0.03)', padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>Kill-Feed PIP (9:16 FPS)</div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>
+                          Overlays top-right kill & headshot confirmations on 9:16 center-cropped FPS video
+                        </div>
+                      </div>
+                      <select
+                        className="select"
+                        style={{ width: '130px', padding: '4px 8px', fontSize: '0.8rem' }}
+                        value={settings.kill_feed_overlay || 'auto'}
+                        onChange={(e) => setSettings({ ...settings, kill_feed_overlay: e.target.value as any })}
+                      >
+                        <option value="auto">Auto (FPS Only)</option>
+                        <option value="on">Always On</option>
+                        <option value="off">Off</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
                 <label className="toggle-label">
                   <div>
                     <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>Contextual Emojis</div>

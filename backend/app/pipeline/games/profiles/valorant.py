@@ -1,6 +1,6 @@
 """Valorant game profile with calibrated HUD regions, agent/weapon lexicons, and detection rules."""
 
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 from pydantic import Field
 from .base import BaseGameProfile
 from backend.app.config import GAME_AWARE_SCORING_WEIGHTS
@@ -47,6 +47,9 @@ class ValorantGameProfile(BaseGameProfile):
     health_region: Tuple[float, float, float, float] = (0.90, 0.16, 0.99, 0.28)
     center_banner_region: Tuple[float, float, float, float] = (0.20, 0.28, 0.45, 0.72)
     bottom_center_skull_region: Tuple[float, float, float, float] = (0.76, 0.44, 0.88, 0.56)
+
+    # Phase 12D: 9:16 PIP Kill-Feed ROI (x_min, y_min, x_max, y_max)
+    kill_feed_roi: Optional[Tuple[float, float, float, float]] = (0.74, 0.04, 0.985, 0.30)
 
     known_ui_patterns: Dict[str, Any] = {
         # Valorant Enemy Red: RGB around [255, 70, 85] (#FF4655)

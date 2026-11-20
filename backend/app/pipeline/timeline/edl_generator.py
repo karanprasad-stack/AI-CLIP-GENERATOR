@@ -69,6 +69,8 @@ class TimelineEdlGenerator:
             aspect_ratio=cand_aspect,
             fps=60,
             enabled=True,
+            kill_feed_overlay=bool(candidate.get("kill_feed_overlay", False)),
+            kill_feed_roi=candidate.get("kill_feed_roi"),
         )
 
         # 3. Subtitles Track & Emoji Track

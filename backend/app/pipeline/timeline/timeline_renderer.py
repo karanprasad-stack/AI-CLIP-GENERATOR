@@ -149,6 +149,8 @@ class TimelineRenderer:
                 output_short_path=vertical_clip_path,
                 layout=timeline.video_track.layout or "smart_crop",
                 aspect_ratio=cand_aspect,
+                kill_feed_overlay=bool(timeline.video_track.kill_feed_overlay),
+                kill_feed_roi=tuple(timeline.video_track.kill_feed_roi) if timeline.video_track.kill_feed_roi else None,
             )
 
         # Step 2: Subtitles & Emojis ASS Burning

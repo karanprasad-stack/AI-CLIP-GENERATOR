@@ -331,6 +331,13 @@ FACECAM_PERSISTENCE_THRESHOLD: float = 0.25
 FACECAM_REGION_TOLERANCE: float = 0.15
 FACECAM_TOP_HEIGHT_RATIO: float = 0.35
 
+# Phase 12D: 9:16 Kill-Feed Picture-in-Picture (PIP) Overlay
+DEFAULT_KILL_FEED_OVERLAY: str = "auto"   # "auto" | "on" | "off"
+KILL_FEED_PIP_WIDTH: int = 420            # px on 1080-wide canvas (even width)
+KILL_FEED_PIP_MARGIN_X: int = 24          # px from right edge
+KILL_FEED_PIP_MARGIN_Y: int = 140         # px from top edge (safely below YouTube/TikTok UI)
+KILL_FEED_PIP_ALPHA: float = 0.92         # overlay opacity
+
 # ==============================================================================
 # Phase 4 Configuration — Subtitles, Karaoke Captions & Contextual Emojis
 # ==============================================================================

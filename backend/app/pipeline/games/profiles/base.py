@@ -28,6 +28,9 @@ class BaseGameProfile(BaseModel):
     health_region: Tuple[float, float, float, float] = (0.85, 0.15, 0.99, 0.35)
     center_banner_region: Tuple[float, float, float, float] = (0.20, 0.30, 0.45, 0.70)
 
+    # Phase 12D: 9:16 PIP Kill-Feed ROI (x_min, y_min, x_max, y_max) normalized to 16:9 source
+    kill_feed_roi: Optional[Tuple[float, float, float, float]] = None
+
     # UI patterns & color markers (HSV / BGR ranges)
     known_ui_patterns: Dict[str, Any] = Field(default_factory=dict)
 

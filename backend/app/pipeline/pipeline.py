@@ -54,6 +54,8 @@ from backend.app.config import (
     get_duration_tier,
     get_narrative_structure,
     LAYOUT_AUTO,
+    LAYOUT_SMART_CROP,
+    DEFAULT_KILL_FEED_OVERLAY,
     CAPTION_FONT_NAME,
     CAPTION_FONT_SIZE,
     CAPTION_BASE_COLOR,
@@ -113,6 +115,7 @@ def run_pipeline(
     """
     aspect_ratio = (settings.get("aspect_ratio") if settings else None) or aspect_ratio or DEFAULT_ASPECT_RATIO
     output_width, output_height = get_output_dimensions(aspect_ratio)
+    kill_feed_setting = (settings.get("kill_feed_overlay") if settings else None) or DEFAULT_KILL_FEED_OVERLAY
     # Normalize phase input
     phase_str = str(phase).strip().lower()
     if phase_str in ["6b", "6B"]:
@@ -397,12 +400,23 @@ def run_pipeline(
 
         # Fast resumption if Phase 3 is already complete
         p3_cached = False
+        user_wants_kf = str(kill_feed_setting).lower() in ("auto", "on", "true")
+        has_roi = getattr(game_profile, "kill_feed_roi", None) is not None
+
         if phase3_metadata_file.exists():
             try:
                 with open(phase3_metadata_file, "r", encoding="utf-8") as f:
                     p3_cached_data = json.load(f)
                 cached_aspect = p3_cached_data.get("aspect_ratio", "9:16")
-                if cached_aspect != aspect_ratio:
+                cached_layout = p3_cached_data.get("layout_strategy", layout)
+                cached_kf_overlay = p3_cached_data.get("kill_feed_overlay", False)
+                expected_kf = bool(
+                    user_wants_kf
+                    and aspect_ratio == "9:16"
+                    and cached_layout == LAYOUT_SMART_CROP
+                    and has_roi
+                )
+                if cached_aspect != aspect_ratio or cached_kf_overlay != expected_kf:
                     p3_cached = False
                 else:
                     cached_list = p3_cached_data.get("candidates", [])
@@ -439,9 +453,15 @@ def run_pipeline(
             layout_detector = LayoutDetector()
             facecam_info = layout_detector.detect_facecam(source_video_path)
             resolved_layout = layout_detector.resolve_layout(layout, facecam_info)
+            use_kill_feed_pip = bool(
+                user_wants_kf
+                and aspect_ratio == "9:16"
+                and resolved_layout == LAYOUT_SMART_CROP
+                and has_roi
+            )
 
             # Step 8: Sequential candidate clip extraction & vertical rendering
-            report_progress(8, f"Processing top {top_n} candidates (Layout: {resolved_layout})...")
+            report_progress(8, f"Processing top {top_n} candidates (Layout: {resolved_layout}, Kill-Feed PIP: {use_kill_feed_pip})...")
             clip_extractor = ClipExtractor()
             renderer = VerticalRenderer()
             validator = VideoValidator()
@@ -472,6 +492,8 @@ def run_pipeline(
                     "short_clip": str(short_clip_file),
                     "layout": resolved_layout,
                     "aspect_ratio": aspect_ratio,
+                    "kill_feed_overlay": use_kill_feed_pip,
+                    "kill_feed_roi": list(game_profile.kill_feed_roi) if game_profile.kill_feed_roi else None,
                     "gameplay_events": cand.get("gameplay_events", []),
                     "gameplay_sequences": cand.get("gameplay_sequences", []),
                     "duration_tier": cand.get("duration_tier", get_duration_tier(cand_end - cand_start)),
@@ -505,6 +527,8 @@ def run_pipeline(
                         facecam_region=facecam_info.get("region"),
                         source_fps=source_fps,
                         aspect_ratio=aspect_ratio,
+                        kill_feed_overlay=use_kill_feed_pip,
+                        kill_feed_roi=game_profile.kill_feed_roi,
                     )
                     cand_record["rendering_time_sec"] = render_info["rendering_time_sec"]
                     cand_record["encoder"] = render_info["encoder"]
@@ -543,6 +567,8 @@ def run_pipeline(
                 "generated_at": datetime.now(timezone.utc).isoformat(),
                 "layout_strategy": resolved_layout,
                 "aspect_ratio": aspect_ratio,
+                "kill_feed_overlay": use_kill_feed_pip,
+                "kill_feed_roi": list(game_profile.kill_feed_roi) if game_profile.kill_feed_roi else None,
                 "facecam_detected": facecam_info.get("facecam_detected", False),
                 "facecam_info": facecam_info,
                 "output_resolution": {

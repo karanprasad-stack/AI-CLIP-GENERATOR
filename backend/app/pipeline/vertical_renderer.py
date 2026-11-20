@@ -4,7 +4,7 @@ import time
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 
 from backend.app.config import (
     OUTPUT_WIDTH,
@@ -24,6 +24,11 @@ from backend.app.config import (
     FACECAM_TOP_HEIGHT_RATIO,
     DEFAULT_ASPECT_RATIO,
     ASPECT_RATIO_1_1,
+    DEFAULT_KILL_FEED_OVERLAY,
+    KILL_FEED_PIP_WIDTH,
+    KILL_FEED_PIP_MARGIN_X,
+    KILL_FEED_PIP_MARGIN_Y,
+    KILL_FEED_PIP_ALPHA,
     get_output_dimensions,
 )
 
@@ -68,9 +73,18 @@ class VerticalRenderer:
         output_width: int = OUTPUT_WIDTH,
         output_height: int = OUTPUT_HEIGHT,
         aspect_ratio: str = DEFAULT_ASPECT_RATIO,
+        kill_feed_overlay: bool = False,
+        kill_feed_roi: Optional[Tuple[float, float, float, float]] = None,
     ) -> str:
         """Construct the FFmpeg complex filtergraph for the selected layout and aspect ratio."""
         is_square = (aspect_ratio == ASPECT_RATIO_1_1) or (output_width == output_height)
+        use_pip = bool(
+            kill_feed_overlay
+            and not is_square
+            and (aspect_ratio == DEFAULT_ASPECT_RATIO or aspect_ratio == "9:16")
+            and (layout == LAYOUT_SMART_CROP or layout == "smart_crop")
+            and (kill_feed_roi is not None)
+        )
 
         if layout == LAYOUT_SMART_CROP:
             if is_square:
@@ -79,6 +93,23 @@ class VerticalRenderer:
                     f"[0:v]crop=ih:ih:(iw-ih)*{focal_x}:0,"
                     f"scale={output_width}:{output_height},"
                     f"setsar=1[outv]"
+                )
+            if use_pip and kill_feed_roi:
+                x1, y1, x2, y2 = kill_feed_roi
+                rw = round(x2 - x1, 4)
+                rh = round(y2 - y1, 4)
+                rx = round(x1, 4)
+                ry = round(y1, 4)
+                return (
+                    f"[0:v]split=2[main_src][kf_src];"
+                    f"[main_src]crop=ih*9/16:ih:(iw-ih*9/16)*{focal_x}:0,"
+                    f"scale={output_width}:{output_height},setsar=1[base];"
+                    f"[kf_src]crop=iw*{rw}:ih*{rh}:iw*{rx}:ih*{ry},"
+                    f"scale={KILL_FEED_PIP_WIDTH}:-2:flags=lanczos,"
+                    f"format=rgba,colorchannelmixer=aa={KILL_FEED_PIP_ALPHA},"
+                    f"pad=iw+6:ih+6:3:3:color=black@0.45[kf_pip];"
+                    f"[base][kf_pip]overlay=W-w-{KILL_FEED_PIP_MARGIN_X}:{KILL_FEED_PIP_MARGIN_Y}:format=auto,"
+                    f"format=yuv420p,setsar=1[outv]"
                 )
             # 9:16 Vertical: Crop 9:16 window centered at focal_x and scale to 1080x1920
             return (
@@ -133,6 +164,23 @@ class VerticalRenderer:
                     f"scale={output_width}:{output_height},"
                     f"setsar=1[outv]"
                 )
+            if use_pip and kill_feed_roi:
+                x1, y1, x2, y2 = kill_feed_roi
+                rw = round(x2 - x1, 4)
+                rh = round(y2 - y1, 4)
+                rx = round(x1, 4)
+                ry = round(y1, 4)
+                return (
+                    f"[0:v]split=2[main_src][kf_src];"
+                    f"[main_src]crop=ih*9/16:ih:(iw-ih*9/16)*{focal_x}:0,"
+                    f"scale={output_width}:{output_height},setsar=1[base];"
+                    f"[kf_src]crop=iw*{rw}:ih*{rh}:iw*{rx}:ih*{ry},"
+                    f"scale={KILL_FEED_PIP_WIDTH}:-2:flags=lanczos,"
+                    f"format=rgba,colorchannelmixer=aa={KILL_FEED_PIP_ALPHA},"
+                    f"pad=iw+6:ih+6:3:3:color=black@0.45[kf_pip];"
+                    f"[base][kf_pip]overlay=W-w-{KILL_FEED_PIP_MARGIN_X}:{KILL_FEED_PIP_MARGIN_Y}:format=auto,"
+                    f"format=yuv420p,setsar=1[outv]"
+                )
             return (
                 f"[0:v]crop=ih*9/16:ih:(iw-ih*9/16)*{focal_x}:0,"
                 f"scale={output_width}:{output_height},"
@@ -148,9 +196,12 @@ class VerticalRenderer:
         source_fps: Optional[float] = None,
         force_cpu: bool = False,
         aspect_ratio: str = DEFAULT_ASPECT_RATIO,
+        kill_feed_overlay: bool = False,
+        kill_feed_roi: Optional[Tuple[float, float, float, float]] = None,
     ) -> Dict[str, Any]:
         """
-        Render a Short from the input clip with selectable aspect ratio (9:16 or 1:1).
+        Render a Short from the input clip with selectable aspect ratio (9:16 or 1:1)
+        and optional 9:16 kill-feed picture-in-picture (PIP) overlay.
         Preserves original audio and source FPS.
         """
         if not input_clip_path.exists():
@@ -167,6 +218,8 @@ class VerticalRenderer:
             output_width=width,
             output_height=height,
             aspect_ratio=aspect_ratio,
+            kill_feed_overlay=kill_feed_overlay,
+            kill_feed_roi=kill_feed_roi,
         )
 
         use_nvenc = self._nvenc_available and not force_cpu
@@ -224,6 +277,8 @@ class VerticalRenderer:
                         source_fps=source_fps,
                         force_cpu=True,
                         aspect_ratio=aspect_ratio,
+                        kill_feed_overlay=kill_feed_overlay,
+                        kill_feed_roi=kill_feed_roi,
                     )
                 raise RenderError(f"FFmpeg vertical render failed: {proc.stderr}")
 
@@ -231,6 +286,14 @@ class VerticalRenderer:
 
             if not output_short_path.exists() or output_short_path.stat().st_size == 0:
                 raise RenderError(f"Rendered Short was not created or is 0 bytes: {output_short_path}")
+
+            pip_applied = bool(
+                kill_feed_overlay
+                and kill_feed_roi is not None
+                and aspect_ratio != ASPECT_RATIO_1_1
+                and width != height
+                and layout == LAYOUT_SMART_CROP
+            )
 
             return {
                 "short_clip_path": str(output_short_path),
@@ -243,6 +306,8 @@ class VerticalRenderer:
                 },
                 "fps": source_fps or OUTPUT_FPS_FALLBACK,
                 "aspect_ratio": aspect_ratio,
+                "kill_feed_overlay": pip_applied,
+                "kill_feed_roi": list(kill_feed_roi) if kill_feed_roi else None,
             }
 
         except subprocess.TimeoutExpired as e:
