@@ -42,6 +42,8 @@ from .long_stream import LongStreamOrchestrator, is_long_stream
 from .subtitles import HinglishNormalizer
 from .creator_quality import CreatorQualityEvaluator, PublishabilityGate
 from .games import GameDetector, GameplayEngine, GameplayTimeline
+from .scene_analyzer import SceneAnalyzer
+from .semantic_reranker import SemanticReranker
 from backend.app.config import (
     MAX_SOURCE_HEIGHT,
     PARTIAL_DOWNLOAD_ENABLED,
@@ -49,6 +51,9 @@ from backend.app.config import (
     PARTIAL_SEGMENT_KEYFRAME_PAD_SEC,
     PARTIAL_SEGMENT_MERGE_GAP_SEC,
     ANALYSIS_PROXY_MAX_HEIGHT,
+    SCENE_ANALYZER_ENABLED,
+    SCENE_ANALYZER_MAX_CANDIDATES,
+    SEMANTIC_RERANKER_ENABLED,
     TOP_N_CANDIDATES,
     PRE_ROLL_SECONDS,
     POST_ROLL_SECONDS,
@@ -229,6 +234,24 @@ def run_pipeline(
                     temp_audio_path = downloader.download_audio(url, output_dir=job_temp_dir)
                     shutil.copy2(temp_audio_path, final_audio_path)
 
+                # Game Detection for Long Streams
+                game_detector = GameDetector()
+                game_profile = game_detector.detect_game(metadata=metadata, transcript_data=None, settings=settings)
+
+                # Visual analysis proxy for long streams if visual profile
+                visual_video_path = None
+                if game_profile.name != "generic":
+                    if source_video_path.exists():
+                        visual_video_path = source_video_path
+                    elif PARTIAL_DOWNLOAD_ENABLED and is_remote_url(url):
+                        report_progress(2, f"Acquiring lightweight 360p analysis proxy for long-stream {game_profile.display_name} detection...")
+                        video_source_downloader = VideoSourceDownloader(temp_dir=job_temp_dir)
+                        proxy_target = job_temp_dir / "analysis_proxy_360p.mp4"
+                        proxy_result = video_source_downloader.download_analysis_proxy(
+                            url=url, output_file=proxy_target, max_height=ANALYSIS_PROXY_MAX_HEIGHT
+                        )
+                        visual_video_path = proxy_result if (proxy_result and proxy_result.exists()) else None
+
                 report_progress(3, "Initializing long-stream chunk planner...")
                 orchestrator = LongStreamOrchestrator()
 
@@ -246,6 +269,8 @@ def run_pipeline(
                     temp_dir=job_temp_dir,
                     settings=settings,
                     event_callback=orchestrator_event_cb,
+                    game_profile=game_profile,
+                    visual_video_path=visual_video_path,
                 )
 
                 ranked_results = {
@@ -257,6 +282,10 @@ def run_pipeline(
                     "candidates": orchestrator_res["candidates"],
                     "selected_candidate_ids": orchestrator_res["selected_candidate_ids"],
                     "quality_gate_reason": orchestrator_res.get("quality_gate_reason"),
+                    "game": game_profile.name if game_profile else "generic",
+                    "game_archetype": game_profile.archetype if game_profile else "generic",
+                    "detected_game_title": getattr(game_profile, "detected_title", None) or (game_profile.display_name if game_profile else "Generic"),
+                    "gameplay_events_file": orchestrator_res.get("gameplay_events_file"),
                 }
                 with open(candidates_file, "w", encoding="utf-8") as f:
                     json.dump(ranked_results, f, indent=2, ensure_ascii=False)
@@ -372,16 +401,61 @@ def run_pipeline(
         effective_duration = video_duration if video_duration > 0 else float(ranked_results.get("duration", 0.0))
         all_candidates = ranked_results.get("candidates", [])
 
+        # Scene Analyzer: static screen penalty & scene cut boundary snapping
+        video_for_scene = None
+        if source_video_path.exists():
+            video_for_scene = source_video_path
+        elif 'cv_video_path' in locals() and cv_video_path and cv_video_path.exists():
+            video_for_scene = cv_video_path
+        elif 'visual_video_path' in locals() and visual_video_path and visual_video_path.exists():
+            video_for_scene = visual_video_path
+
+        if SCENE_ANALYZER_ENABLED and video_for_scene:
+            try:
+                scene_analyzer = SceneAnalyzer()
+                cand_audio = audio_analysis if 'audio_analysis' in locals() else None
+                for cand in all_candidates[:SCENE_ANALYZER_MAX_CANDIDATES]:
+                    scene_res = scene_analyzer.analyze_candidate_dict(
+                        video_path=video_for_scene,
+                        candidate=cand,
+                        audio_analysis=cand_audio,
+                    )
+                    if scene_res.get("is_static_screen"):
+                        cand["scene_warning"] = "Static/motionless screen detected"
+                        cand["final_score"] = round(cand.get("final_score", 0.0) * 0.70, 1)
+                        cand["score"] = cand["final_score"]
+                    if scene_res.get("adjusted_start") != cand.get("start") or scene_res.get("adjusted_end") != cand.get("end"):
+                        cand["start"] = scene_res["adjusted_start"]
+                        cand["end"] = scene_res["adjusted_end"]
+                        cand["duration"] = round(scene_res["adjusted_end"] - scene_res["adjusted_start"], 2)
+                        cand["scene_cut_snapped"] = True
+            except Exception:
+                pass
+
+        # Local LLM Semantic Reranker (hardware-safe, optional)
+        use_semantic_reranker = bool(settings.get("semantic_reranker", True)) if settings else True
+        if use_semantic_reranker:
+            try:
+                reranker = SemanticReranker()
+                all_candidates = reranker.rerank(all_candidates, game_profile=game_profile)
+                ranked_results["candidates"] = all_candidates
+            except Exception:
+                pass
+
         # Phase 7E: Evaluate Creator Quality & Publishability for all candidates
         creator_evaluator = CreatorQualityEvaluator()
         transcript_words = transcript_data.get("words", []) if transcript_data else None
         for cand in all_candidates:
-            if "publishability" not in cand:
+            if "publishability" not in cand or cand.get("semantic_audit", {}).get("enabled"):
                 cand["publishability"] = creator_evaluator.evaluate(
                     candidate=cand,
                     transcript_words=transcript_words,
                     all_candidates=all_candidates,
                 )
+
+        # Re-save candidates_file with any scene-adjusted or reranked candidates
+        with open(candidates_file, "w", encoding="utf-8") as f:
+            json.dump(ranked_results, f, indent=2, ensure_ascii=False)
 
         if phase_num <= 2:
             if job_temp_dir.exists():

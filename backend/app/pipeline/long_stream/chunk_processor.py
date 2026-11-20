@@ -169,6 +169,8 @@ class ChunkProcessor:
         temp_dir: Path,
         video_id: str,
         progress_cb: Optional[Callable[[str], None]] = None,
+        game_profile: Optional[Any] = None,
+        visual_video_path: Optional[Path] = None,
     ) -> Dict[str, Any]:
         """Processes a single chunk, extracting audio, transcribing, detecting candidates, and cleaning up."""
         check_disk_space(temp_dir)
@@ -198,6 +200,24 @@ class ChunkProcessor:
             raw_audio_analysis = self.audio_analyzer.analyze(chunk_audio_path)
             global_audio_analysis = convert_audio_analysis_to_global_time(raw_audio_analysis, plan.source_start)
 
+            # Run gameplay event detection if game profile is provided
+            chunk_timeline = None
+            if game_profile and getattr(game_profile, "name", "generic") != "generic":
+                try:
+                    from backend.app.pipeline.games import GameplayEngine
+                    if progress_cb:
+                        progress_cb(f"Extracting visual & gameplay events for {plan.chunk_id}...")
+                    gameplay_engine = GameplayEngine(profile=game_profile)
+                    chunk_timeline = gameplay_engine.detect_events(
+                        video_path=visual_video_path if (visual_video_path and visual_video_path.exists()) else None,
+                        audio_analysis=global_audio_analysis,
+                        transcript_data=global_transcript,
+                        duration=plan.duration,
+                        start_sec=plan.source_start,
+                    )
+                except Exception:
+                    chunk_timeline = None
+
             # Generate candidate moments within chunk
             transcript_analyzer = TranscriptAnalyzer(global_transcript)
 
@@ -206,6 +226,7 @@ class ChunkProcessor:
                 video_duration=plan.source_end,
                 audio_analysis=global_audio_analysis,
                 transcript_analyzer=transcript_analyzer,
+                gameplay_timeline=chunk_timeline,
             )
 
             # Filter candidates so they stay bounded within this chunk's window
@@ -222,6 +243,8 @@ class ChunkProcessor:
                 video_id=video_id,
                 video_duration=plan.source_end,
                 top_k=20,
+                gameplay_timeline=chunk_timeline,
+                game_profile=game_profile,
             )
 
             candidates = ranked.get("candidates", [])
@@ -236,6 +259,7 @@ class ChunkProcessor:
                 "duration": plan.duration,
                 "status": "completed",
                 "transcript": global_transcript,
+                "gameplay_events": [e.to_dict() for e in chunk_timeline.events] if chunk_timeline else [],
                 "audio_metrics": {
                     "mean_rms": round(float(raw_audio_analysis.get("global_mean_rms", 0.0)), 5),
                     "peaks_count": len(global_audio_analysis.get("peaks", [])),

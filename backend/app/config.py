@@ -258,6 +258,44 @@ LAUGHTER_WORDS: List[str] = [
     "lmfao",
 ]
 
+# Stream Meta-Chatter & Lobby Filler Words (Non-gameplay stream meta talk)
+META_CHATTER_PHRASES: List[str] = [
+    "subscribe",
+    "hit the like",
+    "thanks for the sub",
+    "thanks for the dono",
+    "donation",
+    "in the queue",
+    "queueing up",
+    "loading screen",
+    "brb",
+    "be right back",
+    "check my settings",
+    "audio test",
+    "can you hear me",
+    "stream lagging",
+    "follow the channel",
+    "prime gaming",
+    "drop a follow",
+    "tier 1 sub",
+    "bits",
+    "stream delay",
+    "just chatting",
+]
+
+# Scene Analyzer & Static Screen Detection
+SCENE_ANALYZER_ENABLED: bool = True
+SCENE_ANALYZER_MAX_CANDIDATES: int = 25
+SCENE_STATIC_SCREEN_THRESHOLD: float = 0.60
+SCENE_CUT_CORRELATION_THRESHOLD: float = 0.45
+
+# Local LLM Semantic Highlight Reranker (Ollama http://localhost:11434)
+SEMANTIC_RERANKER_ENABLED: bool = True
+SEMANTIC_RERANKER_HOST: str = "http://localhost:11434"
+SEMANTIC_RERANKER_MODEL: str = "llama3:latest"
+SEMANTIC_RERANKER_TIMEOUT_SEC: float = 6.0
+SEMANTIC_RERANKER_MAX_CANDIDATES: int = 20
+
 # ==============================================================================
 # Phase 3 Configuration — Video Acquisition, Extraction & 9:16 Rendering
 # ==============================================================================

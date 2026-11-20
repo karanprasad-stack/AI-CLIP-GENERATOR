@@ -175,6 +175,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </select>
               </div>
             </div>
+
+            <div style={{ padding: '12px 14px', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 8, border: '1px solid var(--border-color)' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}>
+                <input
+                  type="checkbox"
+                  checked={localSettings.semantic_reranker !== false}
+                  onChange={(e) => handleChange('semantic_reranker', e.target.checked)}
+                />
+                <span>AI Judge & Semantic Reranker (Local Ollama)</span>
+              </label>
+              <p style={{ margin: '4px 0 0 24px', fontSize: '0.78rem', color: 'var(--text-dim)' }}>
+                Evaluates hook strength, storytelling payoff, and down-ranks stream filler. Runs safely on top candidates if local Ollama (Llama 3) is running; falls back seamlessly if offline.
+              </p>
+            </div>
           </div>
         )}
 

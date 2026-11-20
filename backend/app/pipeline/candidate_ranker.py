@@ -17,6 +17,7 @@ from backend.app.config import (
     MAX_OVERLAP_SECONDS,
     EVENT_CLUSTER_WINDOW,
     HIGH_IMPACT_GAMING_WORDS,
+    META_CHATTER_PHRASES,
     get_duration_tier,
     get_narrative_structure,
 )
@@ -167,7 +168,13 @@ class CandidateRanker:
                 kill_events.append(ev)
                 if meta.get("headshot", False):
                     headshot_count += 1
-                if meta.get("is_spectated_player", False) or meta.get("killer") == "spectated_player":
+                if (
+                    meta.get("is_spectated_player", False)
+                    or meta.get("is_local_player", False)
+                    or meta.get("killer") in {"spectated_player", "local_player"}
+                    or meta.get("hud_skull_corroborated", False)
+                    or getattr(ev, "evidence", {}).get("hud_skull")
+                ):
                     spectated_kills_count += 1
 
             if etype == "headshot":
@@ -256,14 +263,20 @@ class CandidateRanker:
             rw_add = 3.0 if round_win else 0.0
             score = min(55.0, max(40.0, base + hs_add + rw_add))
             explanation = f"2K multi-kill confirmed (conf {two_k_conf:.2f})"
-        elif len(kill_events) >= 1:
-            k_cnt = len(kill_events)
-            avg_k_conf = sum(getattr(k, "confidence", 0.5) for k in kill_events) / float(k_cnt)
+        elif spectated_kills_count >= 1:
+            k_cnt = spectated_kills_count
+            avg_k_conf = sum(getattr(k, "confidence", 0.5) for k in kill_events) / float(len(kill_events))
             base = 22.0 + min(5.0, avg_k_conf * 5.0)
             hs_add = min(5.0, headshot_count * 2.5)
             rw_add = 3.0 if round_win else 0.0
             score = min(38.0, max(20.0, base + hs_add + rw_add))
-            explanation = f"{k_cnt} elimination(s) confirmed (conf {avg_k_conf:.2f})"
+            explanation = f"{k_cnt} player elimination(s) confirmed (conf {avg_k_conf:.2f})"
+        elif len(kill_events) >= 1:
+            # Ambient non-spectated kill-feed activity (teammates/enemies trading kills)
+            ambient_pts = min(4.0, len(kill_events) * 1.0)
+            base = 4.0 + ambient_pts + (2.0 if round_win else 0.0)
+            score = min(10.0, max(4.0, base))
+            explanation = f"{len(kill_events)} ambient kill-feed notification(s) (non-player trade)"
         elif round_win or defuse_conf > 0 or plant_conf > 0:
             base = 15.0 + (5.0 if round_win else 0.0) + (4.0 if defuse_conf > 0 else 0.0) + (3.0 if plant_conf > 0 else 0.0)
             score = min(30.0, max(12.0, base))
@@ -822,6 +835,23 @@ class CandidateRanker:
             bound_score, bound_metrics, bound_reasons, bound_penalties = self.calculate_boundary_score(
                 start_sec, end_sec, transcript_analyzer
             )
+
+            # Check for stream meta-chatter / lobby filler phrases (e.g. donations/queueing without concrete gameplay)
+            window_text = " ".join(
+                w["word"].lower() for w in transcript_analyzer.words
+                if start_sec <= w["start"] <= end_sec
+            )
+            meta_chatter_hits = [phrase for phrase in META_CHATTER_PHRASES if phrase in window_text]
+            has_concrete_events = (
+                event_breakdown.get("concrete_gameplay_events", {}).get("score", 0.0) > 0.0
+                or event_metrics.get("concrete_score", 0.0) > 0.0
+            )
+
+            if len(meta_chatter_hits) >= 2 and not has_concrete_events:
+                event_score = max(5.0, round(event_score * 0.40, 1))
+                context_score = max(10.0, round(context_score * 0.50, 1))
+                context_penalties.append("penalized: stream meta-chatter / non-gameplay segment")
+                event_reasons.append(f"penalized for stream meta-chatter ({len(meta_chatter_hits)} hits: {', '.join(meta_chatter_hits[:2])})")
 
             # Calculate composite score using normalized active weights
             w = active_weights

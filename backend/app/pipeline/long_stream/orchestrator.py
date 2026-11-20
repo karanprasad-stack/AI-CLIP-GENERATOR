@@ -64,6 +64,8 @@ class LongStreamOrchestrator:
         temp_dir: Path,
         settings: Optional[Dict[str, Any]] = None,
         event_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        game_profile: Optional[Any] = None,
+        visual_video_path: Optional[Path] = None,
     ) -> Dict[str, Any]:
         """Executes full staged long-stream intelligence pipeline."""
         settings = settings or {}
@@ -133,6 +135,8 @@ class LongStreamOrchestrator:
                     plan=plan,
                     temp_dir=temp_dir,
                     video_id=video_id,
+                    game_profile=game_profile,
+                    visual_video_path=visual_video_path,
                 )
                 store.save_chunk_result(plan.chunk_id, result)
                 plan.status = "completed"
@@ -160,6 +164,46 @@ class LongStreamOrchestrator:
 
             gc.collect()
 
+        # Aggregate & deduplicate gameplay events across all chunks
+        from backend.app.pipeline.games import GameplayTimeline, GameplayEvent
+        all_events_raw: List[GameplayEvent] = []
+        for plan in reconciled_plans:
+            c_res = store.load_chunk_result(plan.chunk_id)
+            if c_res and "gameplay_events" in c_res:
+                for ev_dict in c_res["gameplay_events"]:
+                    try:
+                        all_events_raw.append(GameplayEvent.from_dict(ev_dict))
+                    except Exception:
+                        pass
+
+        # Deduplicate events (same event_type within 1.5s)
+        deduped_events: List[GameplayEvent] = []
+        all_events_raw.sort(key=lambda e: e.start_time)
+        for ev in all_events_raw:
+            duplicate = False
+            for prev in deduped_events:
+                if prev.event_type == ev.event_type and abs(prev.start_time - ev.start_time) <= 1.5:
+                    duplicate = True
+                    break
+            if not duplicate:
+                deduped_events.append(ev)
+
+        master_timeline = GameplayTimeline(
+            game=game_profile.name if game_profile else "generic",
+            events=deduped_events,
+            metadata={
+                "game": game_profile.name if game_profile else "generic",
+                "archetype": game_profile.archetype if game_profile else "generic",
+                "scoring_weights": game_profile.scoring_weights if game_profile else {},
+                "detection_method": "long_stream_chunk_visual_and_audio",
+            }
+        )
+        gameplay_events_file = project_dir / "gameplay_events.json"
+        try:
+            master_timeline.save(gameplay_events_file)
+        except Exception:
+            pass
+
         # 4. Global Candidate Aggregation
         raw_candidates = store.collect_all_candidates()
 
@@ -170,7 +214,7 @@ class LongStreamOrchestrator:
         })
 
         # 5. Global Ranking & Score Normalization
-        ranked = self.global_ranker.calibrate_and_rank(raw_candidates)
+        ranked = self.global_ranker.calibrate_and_rank(raw_candidates, gameplay_timeline=master_timeline)
 
         # 6. Temporal Deduplication
         emit_event("deduplication_started", {
@@ -248,4 +292,6 @@ class LongStreamOrchestrator:
             "selected_candidate_ids": [c["rank"] for c in recommended_shorts],
             "quality_gate_reason": explanation,
             "transcript": merged_transcript,
+            "gameplay_timeline": master_timeline,
+            "gameplay_events_file": str(gameplay_events_file),
         }

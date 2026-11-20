@@ -23,6 +23,7 @@ class ProcessingSettingsSchema(BaseModel):
     thumbnail: bool = Field(default=True)
     metadata_enabled: bool = Field(default=True)
     llm: bool = Field(default=False)
+    semantic_reranker: bool = Field(default=True, description="Enable local LLM semantic reranking if Ollama is running")
     quality_preset: str = Field(default="High", description="Standard, High, Very High, Custom")
     aspect_ratio: str = Field(default="9:16", description="9:16 or 1:1")
     kill_feed_overlay: str = Field(default="auto", description="auto, on, off")

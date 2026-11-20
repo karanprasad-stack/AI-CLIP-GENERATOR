@@ -17,6 +17,7 @@ export interface ProcessingSettings {
   thumbnail: boolean
   metadata_enabled: boolean
   llm: boolean
+  semantic_reranker?: boolean
   quality_preset: 'Standard' | 'High' | 'Very High' | 'Custom'
   aspect_ratio?: '9:16' | '1:1'
   kill_feed_overlay?: 'auto' | 'on' | 'off'
@@ -175,6 +176,16 @@ export interface CandidateOutput {
   duration?: number
 }
 
+export interface SemanticAudit {
+  enabled: boolean
+  score?: number
+  is_filler?: boolean
+  verdict?: string
+  hook_score?: number
+  standalone_score?: number
+  entertainment_score?: number
+}
+
 export interface Candidate {
   candidate_id: number
   rank: number
@@ -198,6 +209,10 @@ export interface Candidate {
   selection_reason?: string
   source_position_str?: string
   publishability?: PublishabilityInfo
+  semantic_audit?: SemanticAudit
+  base_composite_score?: number
+  scene_warning?: string
+  scene_cut_snapped?: boolean
   aspect_ratio?: string
   game_archetype?: string
   detected_game_title?: string

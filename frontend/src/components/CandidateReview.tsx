@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react'
 import {
   CheckSquare, Square, Flame, ArrowRight, Filter, SlidersHorizontal,
   ShieldCheck, AlertTriangle, XCircle, CheckCircle, Video, Play, Pause,
-  RotateCcw, FileText, Copy, Check, Plus, MessageSquare, Clock, Sparkles
+  RotateCcw, FileText, Copy, Check, Plus, MessageSquare, Clock, Sparkles, Bot
 } from 'lucide-react'
 import type { Candidate, ProjectDetail, CandidateSortOption, CandidateFilterOption } from '../types'
 import { getFileUrl, getSourceVideoUrl, getProjectAudioUrl } from '../api/client'
@@ -495,6 +495,16 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
                         {isCandRendered && (
                           <span className="badge badge-green" style={{ fontSize: '0.72rem', padding: '2px 6px', display: 'flex', alignItems: 'center', gap: 4 }}>
                             <Video size={11} /> {c.aspect_ratio === '1:1' || project.settings?.aspect_ratio === '1:1' ? '1:1 RENDERED' : '9:16 RENDERED'}
+                          </span>
+                        )}
+                        {c.semantic_audit?.is_filler && (
+                          <span className="badge badge-amber" style={{ fontSize: '0.72rem', padding: '2px 6px', background: 'rgba(239, 68, 68, 0.2)', color: '#f87171' }}>
+                            FILLER
+                          </span>
+                        )}
+                        {c.scene_cut_snapped && (
+                          <span className="badge badge-purple" style={{ fontSize: '0.72rem', padding: '2px 6px' }}>
+                            SCENE SNAPPED
                           </span>
                         )}
                         <span className="font-mono tabular-nums" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>
@@ -1020,6 +1030,58 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
                         <div style={{ fontSize: '0.78rem', color: '#e2e8f0', fontStyle: 'italic', lineHeight: 1.4 }}>
                           "{activePreviewCandidate.transcript_excerpt}"
                         </div>
+                      </div>
+                    )}
+
+                    {/* Local LLM AI Judge Insight */}
+                    {activePreviewCandidate.semantic_audit?.enabled && (
+                      <div style={{
+                        background: activePreviewCandidate.semantic_audit.is_filler ? 'rgba(239, 68, 68, 0.12)' : 'rgba(16, 185, 129, 0.08)',
+                        borderRadius: 6,
+                        padding: '8px 10px',
+                        border: `1px solid ${activePreviewCandidate.semantic_audit.is_filler ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.25)'}`,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 4,
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', fontWeight: 700, color: activePreviewCandidate.semantic_audit.is_filler ? '#f87171' : 'var(--accent-green)' }}>
+                            <Bot size={13} />
+                            <span>AI Judge Verdict:</span>
+                          </div>
+                          {activePreviewCandidate.semantic_audit.is_filler ? (
+                            <span className="badge badge-amber" style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#f87171', fontSize: '0.68rem', padding: '1px 5px' }}>
+                              Potential Filler
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>
+                              Hook: {activePreviewCandidate.semantic_audit.hook_score ?? '--'} • Payoff: {activePreviewCandidate.semantic_audit.entertainment_score ?? '--'}
+                            </span>
+                          )}
+                        </div>
+                        {activePreviewCandidate.semantic_audit.verdict && (
+                          <div style={{ fontSize: '0.76rem', color: 'var(--text-main)', lineHeight: 1.35 }}>
+                            {activePreviewCandidate.semantic_audit.verdict}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Scene Analyzer Warning */}
+                    {activePreviewCandidate.scene_warning && (
+                      <div style={{
+                        background: 'rgba(245, 158, 11, 0.1)',
+                        border: '1px solid rgba(245, 158, 11, 0.3)',
+                        borderRadius: 6,
+                        padding: '6px 10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        fontSize: '0.73rem',
+                        color: 'var(--accent-amber)',
+                      }}>
+                        <AlertTriangle size={13} />
+                        <span>{activePreviewCandidate.scene_warning}</span>
                       </div>
                     )}
                   </div>
