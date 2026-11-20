@@ -30,6 +30,14 @@ def classify_download_error(err: Exception) -> str:
     return f"Failed to retrieve video from YouTube: {str(err).split('ERROR:')[-1].strip()}"
 
 
+def is_remote_url(url: str) -> bool:
+    """Check if the provided input is an HTTP/HTTPS remote URL."""
+    if not url or not isinstance(url, str):
+        return False
+    u = url.strip().lower()
+    return u.startswith("http://") or u.startswith("https://")
+
+
 class VideoDownloader:
     """Handles YouTube metadata extraction and audio-only extraction via yt-dlp."""
 

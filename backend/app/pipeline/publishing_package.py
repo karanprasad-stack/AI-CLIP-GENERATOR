@@ -359,7 +359,11 @@ class PublishingPackageManager:
             transcript_data=transcript_data,
             phase5_timeline=phase5_timeline,
             phase6a_timeline=phase6a_timeline,
-            source_video_path=str(source_video_path) if source_video_path else "source.mp4",
+            source_video_path=(
+                str(source_video_path)
+                if (source_video_path and Path(source_video_path).exists())
+                else (candidate.get("source_clip") or "source.mp4")
+            ),
         )
         tl_store.save_timeline(publishing_dir.parent, timeline_edl, increment_version=False)
 

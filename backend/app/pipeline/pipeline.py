@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, Optional, Callable, List, Union
 
-from .downloader import VideoDownloader, DownloaderError
+from .downloader import VideoDownloader, DownloaderError, is_remote_url
 from .transcriber import AudioTranscriber, TranscriberError
 from .audio_analyzer import AudioAnalyzer, AudioAnalyzerError
 from .transcript_analyzer import TranscriptAnalyzer
@@ -43,6 +43,12 @@ from .subtitles import HinglishNormalizer
 from .creator_quality import CreatorQualityEvaluator, PublishabilityGate
 from .games import GameDetector, GameplayEngine, GameplayTimeline
 from backend.app.config import (
+    MAX_SOURCE_HEIGHT,
+    PARTIAL_DOWNLOAD_ENABLED,
+    PARTIAL_DOWNLOAD_THRESHOLD_SEC,
+    PARTIAL_SEGMENT_KEYFRAME_PAD_SEC,
+    PARTIAL_SEGMENT_MERGE_GAP_SEC,
+    ANALYSIS_PROXY_MAX_HEIGHT,
     TOP_N_CANDIDATES,
     PRE_ROLL_SECONDS,
     POST_ROLL_SECONDS,
@@ -294,15 +300,37 @@ def run_pipeline(
                 game_detector = GameDetector()
                 game_profile = game_detector.detect_game(metadata=metadata, transcript_data=transcript_data, settings=settings)
 
-                # Ensure Phase 12A visual detection gets source.mp4 on fresh runs
-                if phase_num >= 3 and game_profile.name != "generic" and not source_video_path.exists():
-                    report_progress(4, "Acquiring source video for visual gameplay event detection...")
-                    video_source_downloader = VideoSourceDownloader(temp_dir=job_temp_dir)
-                    video_source_downloader.download_source_video(url=url, output_file=source_video_path)
+                # Ensure Phase 12A visual detection gets appropriate video input
+                is_long_vod = (
+                    PARTIAL_DOWNLOAD_ENABLED
+                    and is_remote_url(url)
+                    and effective_duration > PARTIAL_DOWNLOAD_THRESHOLD_SEC
+                    and not source_video_path.exists()
+                )
+
+                cv_video_path = None
+                if phase_num >= 3 and game_profile.name != "generic":
+                    if not source_video_path.exists():
+                        if is_long_vod:
+                            # Stage 1: Download lightweight 360p analysis proxy instead of full 1080p video
+                            report_progress(4, "Acquiring lightweight 360p proxy for visual gameplay event detection...")
+                            video_source_downloader = VideoSourceDownloader(temp_dir=job_temp_dir)
+                            proxy_target = job_temp_dir / "analysis_proxy_360p.mp4"
+                            proxy_result = video_source_downloader.download_analysis_proxy(
+                                url=url, output_file=proxy_target, max_height=ANALYSIS_PROXY_MAX_HEIGHT
+                            )
+                            cv_video_path = proxy_result if (proxy_result and proxy_result.exists()) else None
+                        else:
+                            report_progress(4, "Acquiring source video for visual gameplay event detection...")
+                            video_source_downloader = VideoSourceDownloader(temp_dir=job_temp_dir)
+                            video_source_downloader.download_source_video(url=url, output_file=source_video_path)
+                            cv_video_path = source_video_path
+                    else:
+                        cv_video_path = source_video_path
 
                 gameplay_engine = GameplayEngine(profile=game_profile)
                 gameplay_timeline = gameplay_engine.detect_events(
-                    video_path=source_video_path if source_video_path.exists() else None,
+                    video_path=cv_video_path if (cv_video_path and cv_video_path.exists()) else None,
                     audio_analysis=audio_analysis,
                     transcript_data=transcript_data,
                     duration=effective_duration,
@@ -438,20 +466,86 @@ def run_pipeline(
         if not p3_cached:
             phase3_start_time = time.perf_counter()
 
-            # Step 6: Acquire source video
-            report_progress(6, "Acquiring source video (single download)...")
-            video_source_downloader = VideoSourceDownloader(temp_dir=temp_root)
-            source_info = video_source_downloader.download_source_video(
-                url=url,
-                output_file=source_video_path,
+            # Determine whether to use two-stage partial segment downloads
+            is_remote = is_remote_url(url)
+            use_partial = (
+                PARTIAL_DOWNLOAD_ENABLED
+                and is_remote
+                and effective_duration > PARTIAL_DOWNLOAD_THRESHOLD_SEC
+                and not source_video_path.exists()
             )
-            source_fps = source_info.get("fps", 30.0)
-            source_duration = source_info.get("duration", effective_duration)
+
+            video_source_downloader = VideoSourceDownloader(temp_dir=temp_root)
+            downloaded_segments: List[Dict[str, Any]] = []
+            cand_to_segment: Dict[int, Dict[str, Any]] = {}
+            total_seg_mb: float = 0.0
+            source_fps: float = 30.0
+            source_duration: float = effective_duration
+
+            if use_partial:
+                try:
+                    report_progress(6, "Resolving 1080p stream URLs for partial segment download...")
+                    stream_info = video_source_downloader.resolve_stream_urls(url, max_height=MAX_SOURCE_HEIGHT)
+                    source_fps = stream_info.get("fps", 30.0)
+                    source_duration = stream_info.get("duration", effective_duration)
+
+                    # Build candidate intervals accounting for pre/post-roll padding
+                    intervals = []
+                    for cand in selected_candidates:
+                        c_start = float(cand.get("start", cand.get("candidate_start", 0.0)))
+                        c_end = float(cand.get("end", cand.get("candidate_end", 0.0)))
+                        intervals.append((max(0.0, c_start - PRE_ROLL_SECONDS), c_end + POST_ROLL_SECONDS))
+
+                    merged_segments = video_source_downloader.merge_clip_intervals(
+                        intervals=intervals,
+                        pad_sec=PARTIAL_SEGMENT_KEYFRAME_PAD_SEC,
+                        merge_gap_sec=PARTIAL_SEGMENT_MERGE_GAP_SEC,
+                        video_duration=source_duration,
+                    )
+
+                    segments_dir = job_output_dir / "segments"
+                    segments_dir.mkdir(parents=True, exist_ok=True)
+
+                    for seg_idx, seg in enumerate(merged_segments, start=1):
+                        s_start = seg["seg_start"]
+                        s_end = seg["seg_end"]
+                        seg_path = segments_dir / f"seg_{int(s_start)}_{int(s_end)}.mp4"
+                        report_progress(6, f"Downloading 1080p segment {seg_idx}/{len(merged_segments)} ({s_start:.1f}s - {s_end:.1f}s)...")
+                        seg_res = video_source_downloader.download_segment(
+                            url=url,
+                            stream_info=stream_info,
+                            seg_start=s_start,
+                            seg_end=s_end,
+                            output_path=seg_path,
+                        )
+                        downloaded_segments.append(seg_res)
+                        total_seg_mb += seg_res.get("size_mb", 0.0)
+                        for m_idx in seg.get("member_indices", []):
+                            cand_to_segment[m_idx] = seg_res
+
+                    report_progress(6, f"Downloaded {len(downloaded_segments)} segment(s) totaling {total_seg_mb:.1f} MB (saved full {source_duration/60:.0f}m VOD download)...")
+                except Exception as e:
+                    report_progress(6, f"Partial segment download failed ({e}); falling back to full source video download...")
+                    use_partial = False
+                    downloaded_segments = []
+                    cand_to_segment = {}
+                    total_seg_mb = 0.0
+
+            if not use_partial:
+                # Step 6: Acquire full source video
+                report_progress(6, "Acquiring source video (single download)...")
+                source_info = video_source_downloader.download_source_video(
+                    url=url,
+                    output_file=source_video_path,
+                )
+                source_fps = source_info.get("fps", 30.0)
+                source_duration = source_info.get("duration", effective_duration)
 
             # Step 7: Layout and Facecam detection
             report_progress(7, "Analyzing video layout & facecam presence...")
             layout_detector = LayoutDetector()
-            facecam_info = layout_detector.detect_facecam(source_video_path)
+            detection_video = downloaded_segments[0]["path"] if (use_partial and downloaded_segments) else source_video_path
+            facecam_info = layout_detector.detect_facecam(detection_video)
             resolved_layout = layout_detector.resolve_layout(layout, facecam_info)
             use_kill_feed_pip = bool(
                 user_wants_kf
@@ -469,6 +563,7 @@ def run_pipeline(
             processed_candidates = []
 
             for idx, cand in enumerate(selected_candidates, start=1):
+                cand_idx_0 = idx - 1
                 cand_start = float(cand["start"])
                 cand_end = float(cand["end"])
                 cand_score = float(cand.get("final_score", cand.get("score", 0.0)))
@@ -506,15 +601,31 @@ def run_pipeline(
 
                 try:
                     # 8a: Extract source clip with padding
-                    ext_info = clip_extractor.extract_candidate(
-                        source_path=source_video_path,
-                        output_clip_path=source_clip_file,
-                        candidate_start=cand_start,
-                        candidate_end=cand_end,
-                        pre_roll=PRE_ROLL_SECONDS,
-                        post_roll=POST_ROLL_SECONDS,
-                        source_duration=source_duration,
-                    )
+                    if use_partial and cand_idx_0 in cand_to_segment:
+                        seg_info = cand_to_segment[cand_idx_0]
+                        seg_path = seg_info["path"]
+                        s_start = seg_info["seg_start"]
+                        s_end = seg_info["seg_end"]
+                        ext_info = clip_extractor.extract_candidate(
+                            source_path=seg_path,
+                            output_clip_path=source_clip_file,
+                            candidate_start=cand_start - s_start,
+                            candidate_end=cand_end - s_start,
+                            pre_roll=PRE_ROLL_SECONDS,
+                            post_roll=POST_ROLL_SECONDS,
+                            source_duration=s_end - s_start,
+                            global_offset=s_start,
+                        )
+                    else:
+                        ext_info = clip_extractor.extract_candidate(
+                            source_path=source_video_path,
+                            output_clip_path=source_clip_file,
+                            candidate_start=cand_start,
+                            candidate_end=cand_end,
+                            pre_roll=PRE_ROLL_SECONDS,
+                            post_roll=POST_ROLL_SECONDS,
+                            source_duration=source_duration,
+                        )
                     cand_record["extraction_start"] = ext_info["extraction_start"]
                     cand_record["extraction_end"] = ext_info["extraction_end"]
                     cand_record["extraction_duration"] = ext_info["extraction_duration"]
@@ -578,6 +689,9 @@ def run_pipeline(
                 "fps": source_fps,
                 "encoder": "h264_nvenc" if renderer.nvenc_available else "libx264",
                 "total_phase3_time_sec": phase3_elapsed,
+                "download_mode": "partial_segments" if use_partial else "full_video",
+                "segments_downloaded": len(downloaded_segments) if use_partial else 0,
+                "total_downloaded_mb": round(total_seg_mb, 2) if use_partial else (round(source_video_path.stat().st_size / (1024 * 1024), 2) if source_video_path.exists() else 0.0),
                 "shorts_requested": len(selected_candidates),
                 "shorts_generated": sum(1 for c in processed_candidates if c.get("status") == "PASS"),
                 "candidates": processed_candidates,

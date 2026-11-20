@@ -262,6 +262,13 @@ LAUGHTER_WORDS: List[str] = [
 # Phase 3 Configuration — Video Acquisition, Extraction & 9:16 Rendering
 # ==============================================================================
 
+# Two-Stage Partial Download Configuration (YouTube VODs > 15 min)
+PARTIAL_DOWNLOAD_ENABLED: bool = True
+PARTIAL_DOWNLOAD_THRESHOLD_SEC: float = 900.0  # 15 minutes — VODs longer than this use partial segment downloads
+PARTIAL_SEGMENT_KEYFRAME_PAD_SEC: float = 5.0  # pre/post buffer around each requested clip for clean keyframe alignment
+PARTIAL_SEGMENT_MERGE_GAP_SEC: float = 30.0    # merge selected clips within 30s of each other into one shared segment download
+ANALYSIS_PROXY_MAX_HEIGHT: int = 360           # lightweight video-only proxy resolution for long-VOD visual CV
+
 # Video Acquisition
 MAX_SOURCE_HEIGHT: int = 1080
 

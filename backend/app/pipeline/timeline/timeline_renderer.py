@@ -87,12 +87,17 @@ class TimelineRenderer:
         pub_cand_dir.mkdir(parents=True, exist_ok=True)
 
         cand_source = pub_cand_dir / (timeline.video_track.source_file or "source.mp4")
+        clips_cand_source = clips_dir / f"candidate_{cid:02d}_source.mp4"
         source_video = project_dir / "source.mp4"
 
         if not source_video.exists():
-            # Check candidate-specific source file (e.g. from live stream segments)
+            # Check candidate-specific source file (e.g. from partial segment downloads or live stream segments)
             if cand_source.exists():
                 source_video = cand_source
+            elif clips_cand_source.exists():
+                source_video = clips_cand_source
+            elif timeline.video_track.source_file and Path(timeline.video_track.source_file).exists():
+                source_video = Path(timeline.video_track.source_file)
             else:
                 live_dir = project_dir / "live"
                 if live_dir.exists():
@@ -130,7 +135,11 @@ class TimelineRenderer:
 
         # Step 1: Boundaries & Vertical 9:16 Cropping
         if boundaries_changed:
-            is_cand_clip = (source_video == cand_source)
+            is_cand_clip = (
+                source_video == cand_source
+                or source_video == clips_cand_source
+                or (timeline.video_track.source_file and source_video == Path(timeline.video_track.source_file))
+            )
             ext_start = 0.0 if is_cand_clip else timeline.boundaries.source_in
             ext_end = timeline.boundaries.duration if is_cand_clip else timeline.boundaries.source_out
 

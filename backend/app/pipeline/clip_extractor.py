@@ -51,6 +51,7 @@ class ClipExtractor:
         pre_roll: float = PRE_ROLL_SECONDS,
         post_roll: float = POST_ROLL_SECONDS,
         source_duration: Optional[float] = None,
+        global_offset: float = 0.0,
     ) -> Dict[str, Any]:
         """
         Extract candidate clip with padding clamped to source duration boundaries.
@@ -58,6 +59,8 @@ class ClipExtractor:
         the output media starts precisely at extraction_start (0.0s relative).
         Stream copy (-c copy) is intentionally avoided because it snaps to preceding
         keyframes, causing timing desynchronization between speech audio and subtitles.
+        When extracting from a segment, global_offset (seg_start) preserves the true global
+        extraction_start / extraction_end timestamps required for Phase 4 subtitle alignment.
         """
         if not source_path.exists():
             raise ClipExtractionError(f"Source video not found: {source_path}")
@@ -120,11 +123,11 @@ class ClipExtractor:
 
             return {
                 "source_clip_path": str(output_clip_path),
-                "candidate_start": round(candidate_start, 3),
-                "candidate_end": round(candidate_end, 3),
+                "candidate_start": round(candidate_start + global_offset, 3),
+                "candidate_end": round(candidate_end + global_offset, 3),
                 "candidate_duration": round(candidate_end - candidate_start, 3),
-                "extraction_start": round(extraction_start, 3),
-                "extraction_end": round(extraction_end, 3),
+                "extraction_start": round(extraction_start + global_offset, 3),
+                "extraction_end": round(extraction_end + global_offset, 3),
                 "extraction_duration": round(clip_duration, 3),
                 "encoder_used": "h264_nvenc" if self._nvenc_available else "libx264",
             }
