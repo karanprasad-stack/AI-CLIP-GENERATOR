@@ -80,7 +80,7 @@ export const ProjectHistory: React.FC<ProjectHistoryProps> = ({
             letterSpacing: '-0.025em',
             marginBottom: 12,
           }}>
-            Turn gaming streams into <span style={{ background: 'linear-gradient(135deg, #22D3EE 0%, #3B82F6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>publish-ready Shorts</span> automatically.
+            Turn gaming streams into <span className="text-gradient-cyan">publish-ready Shorts</span> automatically.
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.98rem', lineHeight: 1.6, marginBottom: 24 }}>
             Local Whisper speech transcription, game event computer vision, karaoke subtitles, and multi-tier previewing — 100% free with zero cloud dependencies.

@@ -63,13 +63,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{
+                <span className="brand-title-gradient" style={{
                   fontWeight: 800,
                   fontSize: '1.15rem',
                   letterSpacing: '-0.025em',
-                  background: 'linear-gradient(135deg, #FFFFFF 0%, #CBD5E1 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
                 }}>
                   AI CLIPPER
                 </span>
