@@ -99,18 +99,18 @@ export const LiveProgress: React.FC<LiveProgressProps> = ({
         gap: 16,
       }}>
         <div className="card" style={{ padding: '14px 18px' }}>
-          <div style={{ color: 'var(--text-dim)', fontSize: '0.75rem', fontWeight: 600 }}>SOURCE DURATION</div>
-          <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)', marginTop: 4 }}>
+          <div style={{ color: 'var(--text-dim)', fontSize: '0.74rem', fontWeight: 600 }}>SOURCE DURATION</div>
+          <div className="font-mono tabular-nums" style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)', marginTop: 4 }}>
             {formatDuration(long_stream_info?.source_duration || project.duration)}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>
-            Stream Chunks: {long_stream_info?.chunks_processed || 1} / {long_stream_info?.total_chunks || 1}
+            Stream Chunks: <span className="font-mono tabular-nums">{long_stream_info?.chunks_processed || 1} / {long_stream_info?.total_chunks || 1}</span>
           </div>
         </div>
 
         <div className="card" style={{ padding: '14px 18px' }}>
-          <div style={{ color: 'var(--text-dim)', fontSize: '0.75rem', fontWeight: 600 }}>MOMENTS DETECTED</div>
-          <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--accent-purple)', marginTop: 4 }}>
+          <div style={{ color: 'var(--text-dim)', fontSize: '0.74rem', fontWeight: 600 }}>MOMENTS DETECTED</div>
+          <div className="font-mono tabular-nums" style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--accent-purple)', marginTop: 4 }}>
             {long_stream_info?.candidates_detected || project.candidates.length}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>
@@ -119,8 +119,8 @@ export const LiveProgress: React.FC<LiveProgressProps> = ({
         </div>
 
         <div className="card" style={{ padding: '14px 18px' }}>
-          <div style={{ color: 'var(--text-dim)', fontSize: '0.75rem', fontWeight: 600 }}>STRONG CLIMAXES</div>
-          <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--accent-cyan)', marginTop: 4 }}>
+          <div style={{ color: 'var(--text-dim)', fontSize: '0.74rem', fontWeight: 600 }}>STRONG CLIMAXES</div>
+          <div className="font-mono tabular-nums" style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--accent-cyan)', marginTop: 4 }}>
             {long_stream_info?.strong_moments || 0}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>
@@ -129,8 +129,8 @@ export const LiveProgress: React.FC<LiveProgressProps> = ({
         </div>
 
         <div className="card" style={{ padding: '14px 18px' }}>
-          <div style={{ color: 'var(--text-dim)', fontSize: '0.75rem', fontWeight: 600 }}>RECOMMENDED SHORTS</div>
-          <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--accent-green)', marginTop: 4 }}>
+          <div style={{ color: 'var(--text-dim)', fontSize: '0.74rem', fontWeight: 600 }}>RECOMMENDED SHORTS</div>
+          <div className="font-mono tabular-nums" style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--accent-green)', marginTop: 4 }}>
             {long_stream_info?.recommended_shorts || project.selected_candidate_ids.length || 5}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>
@@ -146,7 +146,7 @@ export const LiveProgress: React.FC<LiveProgressProps> = ({
             {getStageIcon()}
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>{progress.stage}</h3>
           </div>
-          <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--accent-cyan)' }}>
+          <span className="font-mono tabular-nums" style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--accent-cyan)' }}>
             {progress.percent}%
           </span>
         </div>
@@ -233,7 +233,7 @@ export const LiveProgress: React.FC<LiveProgressProps> = ({
             padding: 14,
             height: 180,
             overflowY: 'auto',
-            fontFamily: 'monospace',
+            fontFamily: 'var(--font-mono)',
             fontSize: '0.78rem',
             color: '#a1a1aa',
             display: 'flex',

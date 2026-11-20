@@ -136,14 +136,8 @@ export const LiveSessionView: React.FC<LiveSessionViewProps> = ({
     switch (liveStatus) {
       case 'live':
         return (
-          <span className="badge badge-red" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 800 }}>
-            <span style={{
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              background: '#ff4444',
-              boxShadow: '0 0 8px #ff4444',
-            }} />
+          <span className="badge badge-red" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+            <span className="live-dot-pulse" style={{ background: '#ef4444' }} />
             LIVE
           </span>
         )
@@ -175,7 +169,7 @@ export const LiveSessionView: React.FC<LiveSessionViewProps> = ({
               {getStatusBadge()}
               <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                 <Clock size={14} />
-                Elapsed: <strong>{formatElapsed(elapsedSec)}</strong>
+                Elapsed: <strong className="font-mono tabular-nums">{formatElapsed(elapsedSec)}</strong>
               </span>
             </div>
             <h2 style={{ fontSize: '1.45rem', fontWeight: 800, margin: 0 }}>
@@ -277,7 +271,7 @@ export const LiveSessionView: React.FC<LiveSessionViewProps> = ({
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
               Segments Processed
             </div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 800 }}>
+            <div className="font-mono tabular-nums" style={{ fontSize: '1.4rem', fontWeight: 800 }}>
               {segmentsProcessed}
             </div>
           </div>
@@ -300,7 +294,7 @@ export const LiveSessionView: React.FC<LiveSessionViewProps> = ({
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
               Candidates Detected
             </div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 800 }}>
+            <div className="font-mono tabular-nums" style={{ fontSize: '1.4rem', fontWeight: 800 }}>
               {candidatesDetected}
             </div>
           </div>
@@ -323,7 +317,7 @@ export const LiveSessionView: React.FC<LiveSessionViewProps> = ({
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
               Publish-Ready Shorts
             </div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent-green)' }}>
+            <div className="font-mono tabular-nums" style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent-green)' }}>
               {publishReadyCount}
             </div>
           </div>
@@ -346,7 +340,7 @@ export const LiveSessionView: React.FC<LiveSessionViewProps> = ({
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
               Live Storage Used
             </div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 800 }}>
+            <div className="font-mono tabular-nums" style={{ fontSize: '1.4rem', fontWeight: 800 }}>
               {storageMb} MB
             </div>
           </div>
@@ -401,7 +395,7 @@ export const LiveSessionView: React.FC<LiveSessionViewProps> = ({
                     ? '3px solid var(--accent-green)'
                     : '3px solid var(--accent-cyan)',
                 }}>
-                  <span style={{ color: 'var(--text-dim)', fontFamily: 'monospace', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                  <span className="font-mono tabular-nums" style={{ color: 'var(--text-dim)', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
                     {evt.time_str}
                   </span>
                   <div style={{ color: 'var(--text-main)', lineHeight: 1.35 }}>
@@ -471,12 +465,12 @@ export const LiveSessionView: React.FC<LiveSessionViewProps> = ({
                           {rec.toUpperCase()}
                         </span>
                         <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>
-                          Duration: <strong>{cand.duration.toFixed(1)}s</strong>
+                          Duration: <strong className="font-mono tabular-nums">{cand.duration.toFixed(1)}s</strong>
                         </span>
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-cyan)' }}>
+                        <span className="font-mono tabular-nums" style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-cyan)' }}>
                           Score: {cand.final_score.toFixed(1)}
                         </span>
                       </div>
@@ -484,7 +478,7 @@ export const LiveSessionView: React.FC<LiveSessionViewProps> = ({
 
                     <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'flex', gap: 14 }}>
                       <span>
-                        Global Window: <strong>{cand.source_position_str || `${cand.start.toFixed(1)}s → ${cand.end.toFixed(1)}s`}</strong>
+                        Global Window: <strong className="font-mono tabular-nums">{cand.source_position_str || `${cand.start.toFixed(1)}s → ${cand.end.toFixed(1)}s`}</strong>
                       </span>
                       {cand.gameplay_event && (
                         <span>

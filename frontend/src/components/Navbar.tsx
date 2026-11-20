@@ -20,16 +20,21 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   return (
     <header style={{
-      background: 'rgba(15, 20, 28, 0.88)',
-      backdropFilter: 'blur(16px)',
+      background: 'rgba(7, 11, 20, 0.85)',
+      backdropFilter: 'blur(20px)',
+      WebkitBackdropFilter: 'blur(20px)',
       borderBottom: '1px solid var(--border-color)',
       position: 'sticky',
       top: 0,
       zIndex: 50,
-      padding: '12px 24px',
+      padding: '0 28px',
+      height: 64,
+      display: 'flex',
+      alignItems: 'center',
     }}>
       <div style={{
-        maxWidth: 1440,
+        maxWidth: 1600,
+        width: '100%',
         margin: '0 auto',
         display: 'flex',
         alignItems: 'center',
@@ -38,32 +43,39 @@ export const Navbar: React.FC<NavbarProps> = ({
         gap: 16,
       }}>
         {/* Brand & Breadcrumbs */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
           <div 
             onClick={() => onNavigate('dashboard')}
-            style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', userSelect: 'none' }}
           >
             <div style={{
-              width: 38,
-              height: 38,
+              width: 36,
+              height: 36,
               borderRadius: 10,
-              background: 'linear-gradient(135deg, #00F2FE 0%, #4FACFE 100%)',
+              background: 'linear-gradient(135deg, #22D3EE 0%, #3B82F6 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#050B14',
-              boxShadow: '0 0 16px rgba(0, 242, 254, 0.4)',
+              color: '#040A14',
+              boxShadow: '0 0 16px rgba(34, 211, 238, 0.35)',
             }}>
-              <PlaySquare size={22} />
+              <PlaySquare size={20} />
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontWeight: 800, fontSize: '1.15rem', letterSpacing: '-0.02em', background: 'linear-gradient(135deg, #fff 0%, #94a3b8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                <span style={{
+                  fontWeight: 800,
+                  fontSize: '1.15rem',
+                  letterSpacing: '-0.025em',
+                  background: 'linear-gradient(135deg, #FFFFFF 0%, #CBD5E1 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                }}>
                   AI CLIPPER
                 </span>
-                <span className="badge badge-cyan" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>7B STUDIO</span>
+                <span className="badge badge-cyan" style={{ fontSize: '0.65rem', padding: '1px 6px' }}>STUDIO</span>
               </div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Gaming Shorts Workstation</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', letterSpacing: '0.01em' }}>Gaming Shorts Workstation</div>
             </div>
           </div>
 
@@ -72,23 +84,25 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 6,
-              fontSize: '0.85rem',
+              gap: 8,
+              fontSize: '0.825rem',
               color: 'var(--text-muted)',
               borderLeft: '1px solid var(--border-color)',
               paddingLeft: 16,
             }}>
               <span
-                style={{ cursor: 'pointer', color: 'var(--text-dim)' }}
+                style={{ cursor: 'pointer', color: 'var(--text-dim)', transition: 'color 0.15s' }}
                 onClick={() => onNavigate('history')}
+                onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--text-main)')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-dim)')}
               >
                 Projects
               </span>
-              <ChevronRight size={14} />
+              <ChevronRight size={14} color="var(--text-dim)" />
               <span style={{
                 color: 'var(--text-main)',
                 fontWeight: 600,
-                maxWidth: 260,
+                maxWidth: 280,
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
@@ -105,21 +119,24 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 6,
-            padding: '6px 12px',
-            background: 'rgba(0,0,0,0.3)',
-            borderRadius: 20,
+            gap: 8,
+            padding: '5px 12px',
+            background: 'rgba(0, 0, 0, 0.4)',
+            borderRadius: 9999,
             border: '1px solid var(--border-color)',
-            fontSize: '0.75rem',
+            fontSize: '0.74rem',
           }}>
-            <span style={{
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              backgroundColor: isBackendConnected ? 'var(--accent-green)' : 'var(--accent-red)',
-              boxShadow: isBackendConnected ? '0 0 8px #10B981' : '0 0 8px #EF4444',
-            }} />
-            <span style={{ color: isBackendConnected ? 'var(--text-main)' : 'var(--text-dim)' }}>
+            <span
+              className={isBackendConnected ? 'live-dot-pulse' : ''}
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                backgroundColor: isBackendConnected ? 'var(--accent-green)' : 'var(--accent-red)',
+                display: 'inline-block',
+              }}
+            />
+            <span style={{ color: isBackendConnected ? 'var(--text-main)' : 'var(--text-dim)', fontWeight: 500 }}>
               {isBackendConnected ? 'FastAPI Local' : 'Disconnected'}
             </span>
           </div>
@@ -129,7 +146,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={() => onNavigate('history')}
             style={{ padding: '7px 14px' }}
           >
-            <History size={16} />
+            <History size={15} />
             <span>Projects ({projectsCount})</span>
           </button>
 
@@ -137,7 +154,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="btn btn-secondary"
             onClick={onOpenSettings}
             title="Processing & Hardware Settings"
-            style={{ padding: '7px 12px' }}
+            style={{ padding: '7px 11px' }}
           >
             <SettingsIcon size={16} />
           </button>

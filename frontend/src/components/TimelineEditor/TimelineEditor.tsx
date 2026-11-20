@@ -466,7 +466,7 @@ export const TimelineEditor: React.FC<TimelineEditorProps> = ({
             >
               {isPlaying ? <Pause size={14} /> : <Play size={14} />}
             </button>
-            <span style={{ fontSize: '0.85rem', fontFamily: 'monospace', color: 'var(--accent-cyan)' }}>
+            <span className="font-mono tabular-nums" style={{ fontSize: '0.85rem', color: 'var(--accent-cyan)', letterSpacing: '0.02em' }}>
               {formatClock(currentTime)} / {formatClock(duration)}
             </span>
           </div>

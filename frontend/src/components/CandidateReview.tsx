@@ -295,17 +295,17 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ textAlign: 'center', padding: '4px 12px', background: 'rgba(16, 185, 129, 0.15)', borderRadius: 6 }}>
-            <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent-green)' }}>{publishCount}</div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>READY TO PUBLISH</div>
+          <div style={{ textAlign: 'center', padding: '6px 16px', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.28)', borderRadius: 8 }}>
+            <div className="font-mono tabular-nums" style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--accent-green)' }}>{publishCount}</div>
+            <div style={{ fontSize: '0.68rem', fontWeight: 600, color: '#a7f3d0', letterSpacing: '0.04em' }}>READY TO PUBLISH</div>
           </div>
-          <div style={{ textAlign: 'center', padding: '4px 12px', background: 'rgba(245, 158, 11, 0.15)', borderRadius: 6 }}>
-            <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent-amber)' }}>{reviewCount}</div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>NEEDS REVIEW</div>
+          <div style={{ textAlign: 'center', padding: '6px 16px', background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.28)', borderRadius: 8 }}>
+            <div className="font-mono tabular-nums" style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--accent-amber)' }}>{reviewCount}</div>
+            <div style={{ fontSize: '0.68rem', fontWeight: 600, color: '#fde68a', letterSpacing: '0.04em' }}>NEEDS REVIEW</div>
           </div>
-          <div style={{ textAlign: 'center', padding: '4px 12px', background: 'rgba(239, 68, 68, 0.15)', borderRadius: 6 }}>
-            <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#f87171' }}>{rejectCount}</div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>REJECTED</div>
+          <div style={{ textAlign: 'center', padding: '6px 16px', background: 'rgba(244, 63, 94, 0.12)', border: '1px solid rgba(244, 63, 94, 0.28)', borderRadius: 8 }}>
+            <div className="font-mono tabular-nums" style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fb7185' }}>{rejectCount}</div>
+            <div style={{ fontSize: '0.68rem', fontWeight: 600, color: '#fecdd3', letterSpacing: '0.04em' }}>REJECTED</div>
           </div>
         </div>
       </div>
@@ -449,17 +449,17 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
               return (
                 <div
                   key={id}
-                  className="card"
+                  className={`card ${isActive ? 'card-glow card-active' : ''}`}
                   onClick={() => setActivePreviewId(id)}
                   style={{
                     display: 'flex',
                     gap: 16,
                     padding: 18,
                     cursor: 'pointer',
-                    borderColor: isActive ? 'var(--accent-cyan)' : (isSelected ? 'rgba(0, 242, 254, 0.4)' : 'var(--border-color)'),
-                    background: isActive ? '#141c29' : 'var(--bg-card)',
-                    boxShadow: isActive ? '0 0 18px rgba(0, 242, 254, 0.12)' : 'none',
-                    transition: 'all 0.18s ease',
+                    borderColor: isActive ? 'var(--accent-cyan)' : (isSelected ? 'rgba(34, 211, 238, 0.45)' : 'var(--border-color)'),
+                    background: isActive ? 'rgba(19, 28, 49, 0.95)' : 'var(--bg-card)',
+                    boxShadow: isActive ? '0 0 20px rgba(34, 211, 238, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.08)' : undefined,
+                    transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
                   }}
                 >
                   {/* Checkbox */}
@@ -497,7 +497,7 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
                             <Video size={11} /> {c.aspect_ratio === '1:1' || project.settings?.aspect_ratio === '1:1' ? '1:1 RENDERED' : '9:16 RENDERED'}
                           </span>
                         )}
-                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                        <span className="font-mono tabular-nums" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>
                           {formatTime(c.start)} → {formatTime(c.end)} ({c.duration.toFixed(1)}s)
                         </span>
                       </div>
@@ -516,7 +516,7 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
                             border: `1px solid ${pub.recommendation === 'publish' ? 'var(--accent-green)' : (pub.recommendation === 'review' ? 'var(--accent-amber)' : '#f87171')}`,
                           }}>
                             {pub.recommendation === 'publish' ? <CheckCircle size={13} color="var(--accent-green)" /> : (pub.recommendation === 'review' ? <AlertTriangle size={13} color="var(--accent-amber)" /> : <XCircle size={13} color="#f87171" />)}
-                            <span style={{
+                            <span className="font-mono tabular-nums" style={{
                               fontSize: '0.78rem',
                               fontWeight: 700,
                               color: pub.recommendation === 'publish' ? 'var(--accent-green)' : (pub.recommendation === 'review' ? 'var(--accent-amber)' : '#f87171'),
@@ -529,7 +529,7 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
                         {/* Raw Moment Score */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                           <Flame size={15} color="var(--accent-cyan)" />
-                          <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-cyan)' }}>
+                          <span className="font-mono tabular-nums" style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-cyan)' }}>
                             Moment: {c.final_score.toFixed(1)}
                           </span>
                         </div>

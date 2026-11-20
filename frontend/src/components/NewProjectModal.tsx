@@ -79,14 +79,15 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
       zIndex: 100,
       padding: 16,
     }}>
-      <div className="card card-glow" style={{
+      <div className="card card-glow animate-modal-in" style={{
         maxWidth: 720,
         width: '100%',
         maxHeight: '94vh',
         overflowY: 'auto',
-        background: '#0d121c',
+        background: '#0D1322',
         border: '1px solid var(--border-color)',
         padding: 28,
+        boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
       }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 22 }}>
@@ -424,22 +425,59 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
                   <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
                     Render Frame Aspect Ratio
                   </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                     <button
                       type="button"
                       className={`btn ${settings.aspect_ratio !== '1:1' ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{ justifyContent: 'center', fontSize: '0.85rem', padding: '8px 12px' }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'flex-start',
+                        gap: 12,
+                        padding: '12px 14px',
+                        borderRadius: 10,
+                      }}
                       onClick={() => setSettings({ ...settings, aspect_ratio: '9:16', resolution: '1080x1920' })}
                     >
-                      9:16 Vertical (1080×1920)
+                      <div style={{
+                        width: 14,
+                        height: 24,
+                        border: '2px solid currentColor',
+                        borderRadius: 3,
+                        opacity: 0.9,
+                        flexShrink: 0,
+                      }} />
+                      <div style={{ textAlign: 'left' }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>9:16 Vertical</div>
+                        <div style={{ fontSize: '0.7rem', opacity: 0.8 }}>1080×1920 • Shorts/Reels/TikTok</div>
+                      </div>
                     </button>
+
                     <button
                       type="button"
                       className={`btn ${settings.aspect_ratio === '1:1' ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{ justifyContent: 'center', fontSize: '0.85rem', padding: '8px 12px' }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'flex-start',
+                        gap: 12,
+                        padding: '12px 14px',
+                        borderRadius: 10,
+                      }}
                       onClick={() => setSettings({ ...settings, aspect_ratio: '1:1', resolution: '1080x1080' })}
                     >
-                      1:1 Square (1080×1080)
+                      <div style={{
+                        width: 18,
+                        height: 18,
+                        border: '2px solid currentColor',
+                        borderRadius: 3,
+                        opacity: 0.9,
+                        flexShrink: 0,
+                      }} />
+                      <div style={{ textAlign: 'left' }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>1:1 Square</div>
+                        <div style={{ fontSize: '0.7rem', opacity: 0.8 }}>1080×1080 • Square Feed/Clips</div>
+                      </div>
                     </button>
                   </div>
                 </div>

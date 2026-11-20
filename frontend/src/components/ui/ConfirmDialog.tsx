@@ -36,12 +36,13 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       zIndex: 200,
       padding: 16,
     }}>
-      <div className="card card-glow" style={{
-        maxWidth: 440,
+      <div className="card card-glow animate-modal-in" style={{
+        maxWidth: 460,
         width: '100%',
-        background: '#121824',
+        background: '#0D1322',
         border: '1px solid var(--border-color)',
         padding: 24,
+        boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

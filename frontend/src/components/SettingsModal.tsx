@@ -41,13 +41,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       zIndex: 100,
       padding: 16,
     }}>
-      <div className="card card-glow" style={{
+      <div className="card card-glow animate-modal-in" style={{
         maxWidth: 680,
         width: '100%',
         maxHeight: '90vh',
         overflowY: 'auto',
         position: 'relative',
-        background: '#10151f',
+        background: 'var(--bg-secondary)',
+        border: '1px solid var(--border-color)',
         padding: 24,
       }}>
         {/* Header */}

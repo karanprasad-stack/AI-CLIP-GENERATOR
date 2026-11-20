@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Download, RefreshCw, Check, Film, Image as ImageIcon, FileText, ArrowLeft, Tag, Key, AlertTriangle, ShieldCheck, Sliders, Copy } from 'lucide-react'
+import { Download, RefreshCw, Check, Film, Image as ImageIcon, FileText, ArrowLeft, Tag, Key, AlertTriangle, ShieldCheck, Sliders, Copy, Sparkles } from 'lucide-react'
 import type { ProjectDetail } from '../types'
 import { getFileUrl, getPackageDownloadUrl, updateMetadata, regenerateMetadata, getOutputDetail } from '../api/client'
 import { TimelineEditor } from './TimelineEditor/TimelineEditor'
@@ -21,6 +21,7 @@ export const PublishingReview: React.FC<PublishingReviewProps> = ({
 
   // Local editing states
   const [title, setTitle] = useState(activePackage?.title || '')
+  const [titleAlternatives, setTitleAlternatives] = useState<string[]>([])
   const [description, setDescription] = useState(activePackage?.description || '')
   const [hashtags, setHashtags] = useState<string[]>(activePackage?.hashtags || [])
   const [keywords, setKeywords] = useState<string[]>(activePackage?.keywords || [])
@@ -40,25 +41,27 @@ export const PublishingReview: React.FC<PublishingReviewProps> = ({
       setHashtags(activePackage.hashtags || [])
       setKeywords(activePackage.keywords || [])
       setSaveSuccess(false)
+      setTitleAlternatives([])
 
-      // Fallback: if description or hashtags are missing from manifest, fetch directly from candidate output
-      if (!activePackage.description || !activePackage.hashtags || activePackage.hashtags.length === 0) {
-        getOutputDetail(project.id, activePackage.candidate_id)
-          .then((detail) => {
-            if (detail?.publishing?.description && !activePackage.description) {
-              setDescription(detail.publishing.description)
-            }
-            if (detail?.publishing?.hashtags && (!activePackage.hashtags || activePackage.hashtags.length === 0)) {
-              setHashtags(detail.publishing.hashtags)
-            }
-            if (detail?.publishing?.keywords && (!activePackage.keywords || activePackage.keywords.length === 0)) {
-              setKeywords(detail.publishing.keywords)
-            }
-          })
-          .catch(() => {
-            // ignore network/fallback errors
-          })
-      }
+      // Fetch package details for alternative titles, full description, and tags
+      getOutputDetail(project.id, activePackage.candidate_id)
+        .then((detail) => {
+          if (detail?.title?.alternatives && Array.isArray(detail.title.alternatives)) {
+            setTitleAlternatives(detail.title.alternatives)
+          }
+          if (detail?.publishing?.description && !activePackage.description) {
+            setDescription(detail.publishing.description)
+          }
+          if (detail?.publishing?.hashtags && (!activePackage.hashtags || activePackage.hashtags.length === 0)) {
+            setHashtags(detail.publishing.hashtags)
+          }
+          if (detail?.publishing?.keywords && (!activePackage.keywords || activePackage.keywords.length === 0)) {
+            setKeywords(detail.publishing.keywords)
+          }
+        })
+        .catch(() => {
+          // ignore network/fallback errors
+        })
     }
   }, [selectedIdx, activePackage, project.id])
 
@@ -421,6 +424,45 @@ export const PublishingReview: React.FC<PublishingReviewProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4, fontSize: '0.75rem', color: 'var(--accent-amber)' }}>
                 <AlertTriangle size={12} />
                 <span>Optimal YouTube Shorts title length is 20–70 characters for mobile viewport.</span>
+              </div>
+            )}
+
+            {titleAlternatives.length > 0 && (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ fontSize: '0.74rem', color: 'var(--text-dim)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <Sparkles size={12} color="var(--accent-purple)" />
+                  <span>AI Title Variants (Click to select):</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {titleAlternatives.map((alt, aIdx) => {
+                    const isSelectedTitle = title === alt
+                    return (
+                      <button
+                        key={aIdx}
+                        type="button"
+                        onClick={() => setTitle(alt)}
+                        style={{
+                          background: isSelectedTitle ? 'rgba(139, 92, 246, 0.16)' : 'rgba(255, 255, 255, 0.03)',
+                          border: isSelectedTitle ? '1px solid rgba(139, 92, 246, 0.45)' : '1px solid var(--border-color)',
+                          color: isSelectedTitle ? '#C084FC' : 'var(--text-muted)',
+                          borderRadius: 6,
+                          padding: '7px 12px',
+                          fontSize: '0.8rem',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 8,
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        <span>{alt}</span>
+                        {isSelectedTitle && <Check size={14} color="#C084FC" />}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
             )}
           </div>
