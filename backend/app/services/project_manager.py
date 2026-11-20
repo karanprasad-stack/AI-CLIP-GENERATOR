@@ -23,9 +23,14 @@ from backend.app.pipeline.description_engine import DescriptionEngine
 from backend.app.pipeline.hashtag_engine import HashtagEngine
 
 
-def extract_youtube_id(url: str) -> Optional[str]:
-    """Extract 11-char YouTube ID from common URL formats."""
-    match = re.search(r'(?:v=|\/|youtu\.be\/)([0-9A-Za-z_-]{11})', url)
+def extract_youtube_id(url: Optional[str]) -> Optional[str]:
+    """Extract 11-char YouTube ID from common URL formats or raw 11-char ID string."""
+    if not url or not isinstance(url, str):
+        return None
+    cleaned = url.strip()
+    if re.match(r'^[0-9A-Za-z_-]{11}$', cleaned):
+        return cleaned
+    match = re.search(r'(?:v=|\/|youtu\.be\/|embed\/|v\/|shorts\/)([0-9A-Za-z_-]{11})', cleaned)
     return match.group(1) if match else None
 
 
@@ -234,6 +239,10 @@ class ProjectManager:
         # Check source video file
         source_mp4 = base_dir / "source.mp4"
         has_source = bool(source_mp4.exists() and source_mp4.is_file() and source_mp4.stat().st_size > 0)
+        if not has_source:
+            custom_path = proj.get("source_video_file") or proj.get("source_video_path")
+            if custom_path and Path(custom_path).exists() and Path(custom_path).is_file():
+                has_source = True
         proj["has_source_video"] = has_source
         proj["source_video_url"] = f"/api/projects/{proj['id']}/source-video" if has_source else None
 
@@ -246,10 +255,31 @@ class ProjectManager:
         proj["has_audio"] = has_audio
         proj["audio_url"] = f"/api/projects/{proj['id']}/audio" if has_audio else None
 
-        # YouTube video ID resolution
-        yt_id = extract_youtube_id(proj.get("url", "")) or extract_youtube_id(video_id)
+        # YouTube video ID resolution from ALL possible sources
+        yt_id = (
+            extract_youtube_id(proj.get("youtube_video_id"))
+            or extract_youtube_id(proj.get("url"))
+            or extract_youtube_id(proj.get("source_url"))
+            or extract_youtube_id(video_id)
+            or extract_youtube_id(proj.get("id"))
+        )
+        if not yt_id and base_dir.exists():
+            meta_path = base_dir / "metadata.json"
+            if meta_path.exists():
+                try:
+                    with open(meta_path, "r", encoding="utf-8") as mf:
+                        m = json.load(mf)
+                        yt_id = (
+                            extract_youtube_id(m.get("video_id"))
+                            or extract_youtube_id(m.get("id"))
+                            or extract_youtube_id(m.get("url"))
+                            or extract_youtube_id(m.get("webpage_url"))
+                        )
+                except Exception:
+                    pass
+
         proj["youtube_video_id"] = yt_id
-        if "source_url" not in proj:
+        if "source_url" not in proj or not proj["source_url"]:
             proj["source_url"] = proj.get("url", "")
 
         # Auto-load candidates if list is empty but candidates.json exists on disk

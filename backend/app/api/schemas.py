@@ -174,6 +174,12 @@ class ProjectDetailResponse(BaseModel):
     published_packages: List[Dict[str, Any]] = []
     progress: ProgressStateSchema
     error: Optional[Dict[str, Any]] = None
+    has_source_video: bool = False
+    source_video_url: Optional[str] = None
+    youtube_video_id: Optional[str] = None
+    has_audio: bool = False
+    audio_url: Optional[str] = None
+    source_url: Optional[str] = None
 
 
 class ProjectSummaryResponse(BaseModel):

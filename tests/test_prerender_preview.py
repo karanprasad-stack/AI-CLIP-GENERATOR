@@ -76,6 +76,45 @@ class TestPreRenderPreview(unittest.TestCase):
         c2 = decorated["candidates"][1]
         self.assertEqual(c2["transcript_excerpt"], "")
 
+        # Verify that GET /api/projects/{id} via FastAPI TestClient preserves all preview fields (not stripped by Pydantic)
+        api_resp = self.client.get(f"/api/projects/{proj['id']}")
+        self.assertEqual(api_resp.status_code, 200)
+        api_data = api_resp.json()
+        self.assertTrue(api_data.get("has_source_video"))
+        self.assertEqual(api_data.get("source_video_url"), f"/api/projects/{proj['id']}/source-video")
+        self.assertTrue(api_data.get("has_audio"))
+        self.assertEqual(api_data.get("audio_url"), f"/api/projects/{proj['id']}/audio")
+        self.assertEqual(api_data.get("youtube_video_id"), vid_id)
+        self.assertIn("Incredible clutch play right now!", api_data["candidates"][0]["transcript_excerpt"])
+
+    def test_youtube_video_id_extraction_all_sources(self):
+        """Verifies youtube_video_id extraction from raw 11-char ID, metadata.json, and shorts/urls without source.mp4."""
+        vid_id = "testraw11ch"
+        proj_dir = self.output_dir / vid_id
+        proj_dir.mkdir(parents=True, exist_ok=True)
+
+        # Write metadata.json and audio.wav (no source.mp4)
+        meta = {
+            "id": vid_id,
+            "title": "Raw 11-Char Video",
+            "url": f"https://www.youtube.com/shorts/{vid_id}",
+        }
+        (proj_dir / "metadata.json").write_text(json.dumps(meta), encoding="utf-8")
+        (proj_dir / "audio.wav").write_bytes(b"AUDIO" * 20)
+
+        proj = self.pm.create_project(
+            f"https://www.youtube.com/shorts/{vid_id}",
+            title="Shorts Test",
+        )
+        api_resp = self.client.get(f"/api/projects/{proj['id']}")
+        self.assertEqual(api_resp.status_code, 200)
+        api_data = api_resp.json()
+
+        self.assertFalse(api_data.get("has_source_video"))
+        self.assertIsNone(api_data.get("source_video_url"))
+        self.assertTrue(api_data.get("has_audio"))
+        self.assertEqual(api_data.get("youtube_video_id"), vid_id)
+
     def test_source_video_http_206_streaming(self):
         """Tests GET /api/projects/{id}/source-video with full and byte-range requests."""
         vid_id = "stream00001"

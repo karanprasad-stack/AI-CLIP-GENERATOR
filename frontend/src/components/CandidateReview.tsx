@@ -23,6 +23,27 @@ function formatTime(sec: number): string {
   return `${m}:${s < 10 ? '0' : ''}${s}`
 }
 
+function extractYoutubeId(project: ProjectDetail): string | null {
+  if (project.youtube_video_id && /^[0-9A-Za-z_-]{11}$/.test(project.youtube_video_id)) {
+    return project.youtube_video_id
+  }
+  const sources = [
+    project.youtube_video_id,
+    project.source_url,
+    project.url,
+    project.video_id,
+    project.id,
+  ]
+  for (const src of sources) {
+    if (!src || typeof src !== 'string') continue
+    const trimmed = src.trim()
+    if (/^[0-9A-Za-z_-]{11}$/.test(trimmed)) return trimmed
+    const match = trimmed.match(/(?:v=|\/|youtu\.be\/|embed\/|shorts\/)([0-9A-Za-z_-]{11})/)
+    if (match) return match[1]
+  }
+  return null
+}
+
 export const CandidateReview: React.FC<CandidateReviewProps> = ({
   project,
   onRender,
@@ -55,11 +76,14 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(activePreviewCandidate?.start || 0)
+  const [sourceVideoError, setSourceVideoError] = useState(false)
+  const [preferAudioPreview, setPreferAudioPreview] = useState(false)
 
   useEffect(() => {
     if (activePreviewCandidate) {
       setCurrentTime(activePreviewCandidate.start)
       setIsPlaying(false)
+      setSourceVideoError(false)
       if (videoRef.current) {
         videoRef.current.currentTime = activePreviewCandidate.start
         videoRef.current.pause()
@@ -666,7 +690,7 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
 
                 // Priority 2: Local source.mp4 with scoped window scrubber
                 const hasLocalSource = Boolean(project.has_source_video || project.source_video_url)
-                if (hasLocalSource) {
+                if (hasLocalSource && !sourceVideoError && !preferAudioPreview) {
                   const sourceVideoSrc = project.source_video_url || getSourceVideoUrl(project.id)
                   const candDuration = Math.max(0.1, activePreviewCandidate.end - activePreviewCandidate.start)
                   const relativeProgress = Math.min(Math.max(0, currentTime - activePreviewCandidate.start), candDuration)
@@ -691,6 +715,7 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
                           <Video size={14} />
                           <span>Source Preview (Pre-Render)</span>
+                          <span className="badge badge-cyan" style={{ fontSize: '0.7rem', padding: '1px 6px' }}>Local File</span>
                         </div>
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
                           Window: {formatTime(activePreviewCandidate.start)} → {formatTime(activePreviewCandidate.end)} ({activePreviewCandidate.duration.toFixed(1)}s)
@@ -706,8 +731,10 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
                         onPlay={() => setIsPlaying(true)}
                         onPause={() => setIsPlaying(false)}
                         onClick={handlePlayPause}
+                        onError={() => setSourceVideoError(true)}
                         style={{
                           width: '100%',
+                          minHeight: 240,
                           maxHeight: 280,
                           aspectRatio: '16 / 9',
                           display: 'block',
@@ -769,10 +796,11 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
                 }
 
                 // Priority 3: YouTube Embed fallback
-                if (project.youtube_video_id) {
+                const resolvedYtId = extractYoutubeId(project)
+                if (resolvedYtId && !preferAudioPreview) {
                   const startSec = Math.floor(activePreviewCandidate.start)
                   const endSec = Math.ceil(activePreviewCandidate.end)
-                  const embedUrl = `https://www.youtube.com/embed/${project.youtube_video_id}?start=${startSec}&end=${endSec}&autoplay=0&rel=0`
+                  const embedUrl = `https://www.youtube.com/embed/${resolvedYtId}?start=${startSec}&end=${endSec}&autoplay=0&rel=0`
 
                   return (
                     <div style={{
@@ -794,18 +822,20 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', fontWeight: 600, color: '#f87171' }}>
                           <Video size={14} />
                           <span>YouTube Stream Preview</span>
+                          <span className="badge badge-purple" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', fontSize: '0.7rem', padding: '1px 6px' }}>YouTube Embed</span>
                         </div>
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
                           Window: {formatTime(activePreviewCandidate.start)} → {formatTime(activePreviewCandidate.end)}
                         </span>
                       </div>
                       <iframe
-                        key={`${project.youtube_video_id}-${activePreviewCandidate.rank}-${startSec}-${endSec}`}
+                        key={`${resolvedYtId}-${activePreviewCandidate.rank}-${startSec}-${endSec}`}
                         src={embedUrl}
                         title={`YouTube Preview ${activePreviewCandidate.rank}`}
                         style={{
                           width: '100%',
-                          height: 240,
+                          minHeight: 240,
+                          aspectRatio: '16 / 9',
                           border: 'none',
                           display: 'block',
                           background: '#000',
@@ -813,6 +843,24 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
                       />
+                      <div style={{
+                        padding: '6px 12px',
+                        background: 'rgba(15, 23, 42, 0.85)',
+                        borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        fontSize: '0.72rem',
+                        color: 'var(--text-dim)',
+                      }}>
+                        <span>Local video not yet downloaded (Phase 2 Ingest). Playing stream embed.</span>
+                        <button
+                          style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', fontSize: '0.72rem', textDecoration: 'underline' }}
+                          onClick={() => setPreferAudioPreview(true)}
+                        >
+                          Can't play? Switch to Audio
+                        </button>
+                      </div>
                     </div>
                   )
                 }
@@ -846,8 +894,9 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
                     </div>
 
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-main)', marginBottom: 2 }}>
-                        Candidate Awaiting {aspectLabel} Render
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-main)', marginBottom: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                        <span>Candidate Awaiting {aspectLabel} Render</span>
+                        <span className="badge badge-amber" style={{ fontSize: '0.7rem', padding: '1px 6px' }}>Audio Fallback</span>
                       </div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>
                         Source Window: <strong>{formatTime(activePreviewCandidate.start)} → {formatTime(activePreviewCandidate.end)}</strong> ({activePreviewCandidate.duration.toFixed(1)}s)
@@ -867,6 +916,20 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
                         style={{ width: '100%', height: 32 }}
                       />
                     </div>
+
+                    {resolvedYtId && (
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => {
+                          setPreferAudioPreview(false)
+                          setSourceVideoError(false)
+                        }}
+                        style={{ fontSize: '0.75rem', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 6 }}
+                      >
+                        <Video size={13} color="#f87171" />
+                        <span>Switch to YouTube Video Preview</span>
+                      </button>
+                    )}
 
                     <div style={{ fontSize: '0.74rem', color: 'var(--text-dim)', background: 'rgba(255,255,255,0.04)', padding: '6px 12px', borderRadius: 4, maxWidth: 320 }}>
                       Select this candidate and click <strong>Render Selected Shorts</strong> below to produce {aspectLabel} video with subtitles & effects.

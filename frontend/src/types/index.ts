@@ -313,6 +313,7 @@ export interface ProjectDetail {
   youtube_video_id?: string | null
   has_audio?: boolean
   audio_url?: string | null
+  source_url?: string | null
   error?: {
     summary: string
     details: string
