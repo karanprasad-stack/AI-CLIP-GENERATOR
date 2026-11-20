@@ -203,6 +203,10 @@ export interface Candidate {
   detected_game_title?: string
   effect_style?: string
   rendered?: boolean
+  transcript_excerpt?: string
+  gameplay_events?: any[]
+  duration_tier?: string
+  ranking_reasons?: string[]
   output?: CandidateOutput | null
 }
 
@@ -304,6 +308,11 @@ export interface ProjectDetail {
   selected_candidate_ids: number[]
   published_packages: PublishedPackage[]
   progress: ProgressState
+  has_source_video?: boolean
+  source_video_url?: string | null
+  youtube_video_id?: string | null
+  has_audio?: boolean
+  audio_url?: string | null
   error?: {
     summary: string
     details: string
@@ -327,4 +336,4 @@ export interface ProjectSummary {
 }
 
 export type CandidateSortOption = 'score' | 'duration' | 'rank' | 'publishability'
-export type CandidateFilterOption = 'all' | 'publish' | 'review' | 'reject' | 'strong' | 'funny' | 'combat' | 'timing'
+export type CandidateFilterOption = 'all' | 'selected' | 'publish' | 'review' | 'reject' | 'strong' | 'funny' | 'combat' | 'timing'

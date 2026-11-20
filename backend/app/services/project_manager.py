@@ -231,6 +231,27 @@ class ProjectManager:
         base_dir = self.output_dir / video_id
         pub_dir = base_dir / "publishing"
 
+        # Check source video file
+        source_mp4 = base_dir / "source.mp4"
+        has_source = bool(source_mp4.exists() and source_mp4.is_file() and source_mp4.stat().st_size > 0)
+        proj["has_source_video"] = has_source
+        proj["source_video_url"] = f"/api/projects/{proj['id']}/source-video" if has_source else None
+
+        # Check audio track
+        audio_file = base_dir / "audio.wav"
+        has_audio = bool(audio_file.exists() and audio_file.is_file() and audio_file.stat().st_size > 0)
+        if not has_audio:
+            audio_file = base_dir / "audio.mp3"
+            has_audio = bool(audio_file.exists() and audio_file.is_file() and audio_file.stat().st_size > 0)
+        proj["has_audio"] = has_audio
+        proj["audio_url"] = f"/api/projects/{proj['id']}/audio" if has_audio else None
+
+        # YouTube video ID resolution
+        yt_id = extract_youtube_id(proj.get("url", "")) or extract_youtube_id(video_id)
+        proj["youtube_video_id"] = yt_id
+        if "source_url" not in proj:
+            proj["source_url"] = proj.get("url", "")
+
         # Auto-load candidates if list is empty but candidates.json exists on disk
         if not proj.get("candidates"):
             cand_file = base_dir / "candidates.json"
@@ -305,9 +326,34 @@ class ProjectManager:
         rendered_count = 0
         pkgs_by_cid = {p.get("candidate_id"): p for p in proj.get("published_packages", []) if p.get("candidate_id")}
 
+        # Load transcript for candidate excerpts if available
+        transcript_file = base_dir / "transcript.json"
+        transcript_segments = []
+        if transcript_file.exists():
+            try:
+                with open(transcript_file, "r", encoding="utf-8") as tf:
+                    t_data = json.load(tf)
+                    transcript_segments = t_data.get("segments", [])
+            except Exception:
+                pass
+
         for idx, cand in enumerate(cands, 1):
             cid = cand.get("candidate_id") or cand.get("rank", idx)
             cand["candidate_id"] = cid
+
+            # Populate transcript excerpt if missing
+            if not cand.get("transcript_excerpt"):
+                c_start = float(cand.get("start", 0.0))
+                c_end = float(cand.get("end", 0.0))
+                matched_texts = []
+                for seg in transcript_segments:
+                    s_start = float(seg.get("start", 0.0))
+                    s_end = float(seg.get("end", 0.0))
+                    if s_end >= c_start and s_start <= c_end:
+                        text = seg.get("text", "").strip()
+                        if text:
+                            matched_texts.append(text)
+                cand["transcript_excerpt"] = " ".join(matched_texts).strip()
             cand_dir = pub_dir / f"candidate_{cid:02d}"
             final_mp4 = cand_dir / "final.mp4"
             thumb_jpg = cand_dir / "thumbnail.jpg"

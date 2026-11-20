@@ -137,6 +137,14 @@ export function getFileUrl(id: string, relativePath: string): string {
   return `${API_BASE}/projects/${id}/files/${cleanPath.replace(/\\/g, '/')}`
 }
 
+export function getSourceVideoUrl(id: string): string {
+  return `${API_BASE}/projects/${id}/source-video`
+}
+
+export function getProjectAudioUrl(id: string): string {
+  return `${API_BASE}/projects/${id}/audio`
+}
+
 export function subscribeProjectEvents(
   id: string,
   onEvent: (event: any) => void,

@@ -392,6 +392,98 @@ def download_package(project_id: str, candidate_id: Optional[int] = None):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+def stream_file_partial(target_file: Path, media_type: str, request: Request):
+    """Serves media assets with HTTP 206 Partial Content byte-range support for video and audio seeking."""
+    if not target_file.exists() or not target_file.is_file():
+        raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail=f"File not found: {target_file.name}")
+
+    file_size = target_file.stat().st_size
+    range_header = request.headers.get("Range")
+
+    if range_header:
+        byte1, byte2 = 0, None
+        match = re.search(r"bytes=(\d+)-(\d*)", range_header)
+        if match:
+            g1, g2 = match.groups()
+            byte1 = int(g1)
+            if g2:
+                byte2 = int(g2)
+
+        byte1 = max(0, min(byte1, file_size - 1)) if file_size > 0 else 0
+        if byte2 is not None:
+            byte2 = min(byte2, file_size - 1)
+
+        length = file_size - byte1 if byte2 is None else byte2 - byte1 + 1
+        content_range = f"bytes {byte1}-{byte1 + length - 1}/{file_size}"
+
+        def iterfile():
+            with open(target_file, "rb") as f:
+                f.seek(byte1)
+                remaining = length
+                chunk_size = 1024 * 512
+                while remaining > 0:
+                    read_len = min(remaining, chunk_size)
+                    chunk = f.read(read_len)
+                    if not chunk:
+                        break
+                    remaining -= len(chunk)
+                    yield chunk
+
+        headers = {
+            "Content-Range": content_range,
+            "Accept-Ranges": "bytes",
+            "Content-Length": str(length),
+        }
+        return StreamingResponse(iterfile(), status_code=206, headers=headers, media_type=media_type)
+
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Length": str(file_size),
+    }
+    return FileResponse(path=str(target_file), media_type=media_type, headers=headers)
+
+
+@router.get("/projects/{project_id}/source-video")
+def get_source_video(project_id: str, request: Request):
+    """Streams the source video file (source.mp4) using HTTP 206 Partial Content."""
+    validate_pid(project_id)
+    proj = project_manager.get_project(project_id)
+    if not proj:
+        raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Project not found")
+
+    base_dir = project_manager.output_dir / proj["video_id"]
+    source_file = base_dir / "source.mp4"
+    if not source_file.exists():
+        custom_path = proj.get("source_video_file") or proj.get("source_video_path")
+        if custom_path and Path(custom_path).exists():
+            source_file = Path(custom_path)
+        else:
+            raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Source video not found")
+
+    return stream_file_partial(source_file, "video/mp4", request)
+
+
+@router.get("/projects/{project_id}/audio")
+def get_project_audio(project_id: str, request: Request):
+    """Streams the project audio track (audio.wav or audio.mp3) with HTTP 206 Partial Content."""
+    validate_pid(project_id)
+    proj = project_manager.get_project(project_id)
+    if not proj:
+        raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Project not found")
+
+    base_dir = project_manager.output_dir / proj["video_id"]
+    audio_file = base_dir / "audio.wav"
+    media_type = "audio/wav"
+    if not audio_file.exists():
+        audio_file = base_dir / "audio.mp3"
+        media_type = "audio/mpeg"
+
+    if not audio_file.exists():
+        raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Audio file not found")
+
+    return stream_file_partial(audio_file, media_type, request)
+
+
 @router.get("/projects/{project_id}/files/{file_path:path}")
 def serve_project_file(project_id: str, file_path: str, request: Request):
     """Serves media assets (MP4, JPG, WAV) with byte-range support for browser video seeking."""
@@ -418,48 +510,13 @@ def serve_project_file(project_id: str, file_path: str, request: Request):
         ".jpeg": "image/jpeg",
         ".png": "image/png",
         ".wav": "audio/wav",
+        ".mp3": "audio/mpeg",
         ".json": "application/json",
         ".txt": "text/plain",
     }
     media_type = media_types.get(ext, "application/octet-stream")
 
-    # Byte-range request support for video scrubbing
-    range_header = request.headers.get("Range")
-    file_size = target_file.stat().st_size
-
-    if range_header and media_type.startswith("video/"):
-        byte1, byte2 = 0, None
-        match = re.search(r"bytes=(\d+)-(\d*)", range_header)
-        if match:
-            g1, g2 = match.groups()
-            byte1 = int(g1)
-            if g2:
-                byte2 = int(g2)
-
-        length = file_size - byte1 if byte2 is None else byte2 - byte1 + 1
-        content_range = f"bytes {byte1}-{byte1 + length - 1}/{file_size}"
-
-        def iterfile():
-            with open(target_file, "rb") as f:
-                f.seek(byte1)
-                remaining = length
-                chunk_size = 1024 * 512
-                while remaining > 0:
-                    read_len = min(remaining, chunk_size)
-                    chunk = f.read(read_len)
-                    if not chunk:
-                        break
-                    remaining -= len(chunk)
-                    yield chunk
-
-        headers = {
-            "Content-Range": content_range,
-            "Accept-Ranges": "bytes",
-            "Content-Length": str(length),
-        }
-        return StreamingResponse(iterfile(), status_code=206, headers=headers, media_type=media_type)
-
-    return FileResponse(path=str(target_file), media_type=media_type)
+    return stream_file_partial(target_file, media_type, request)
 
 
 # ==============================================================================

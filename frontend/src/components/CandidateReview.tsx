@@ -1,7 +1,11 @@
-import React, { useState, useMemo } from 'react'
-import { CheckSquare, Square, Flame, ArrowRight, Filter, SlidersHorizontal, ShieldCheck, AlertTriangle, XCircle, CheckCircle, Video, Play, FileText, Copy, Check } from 'lucide-react'
+import React, { useState, useMemo, useRef, useEffect } from 'react'
+import {
+  CheckSquare, Square, Flame, ArrowRight, Filter, SlidersHorizontal,
+  ShieldCheck, AlertTriangle, XCircle, CheckCircle, Video, Play, Pause,
+  RotateCcw, FileText, Copy, Check, Plus, MessageSquare, Clock, Sparkles
+} from 'lucide-react'
 import type { Candidate, ProjectDetail, CandidateSortOption, CandidateFilterOption } from '../types'
-import { getFileUrl } from '../api/client'
+import { getFileUrl, getSourceVideoUrl, getProjectAudioUrl } from '../api/client'
 import { ScoreBar } from './ui/ScoreBar'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 import { EmptyState } from './ui/EmptyState'
@@ -43,6 +47,79 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
     )
   }, [project.candidates, activePreviewId])
 
+  const isSquare = project.settings?.aspect_ratio === '1:1'
+  const aspectLabel = isSquare ? '1:1' : '9:16'
+
+  // Pre-render video & audio player state
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [currentTime, setCurrentTime] = useState(activePreviewCandidate?.start || 0)
+
+  useEffect(() => {
+    if (activePreviewCandidate) {
+      setCurrentTime(activePreviewCandidate.start)
+      setIsPlaying(false)
+      if (videoRef.current) {
+        videoRef.current.currentTime = activePreviewCandidate.start
+        videoRef.current.pause()
+      }
+      if (audioRef.current) {
+        audioRef.current.currentTime = activePreviewCandidate.start
+        audioRef.current.pause()
+      }
+    }
+  }, [activePreviewCandidate?.rank, activePreviewCandidate?.candidate_id, activePreviewCandidate?.start, activePreviewCandidate?.end])
+
+  const handlePlayPause = () => {
+    if (!videoRef.current || !activePreviewCandidate) return
+    if (isPlaying) {
+      videoRef.current.pause()
+      setIsPlaying(false)
+    } else {
+      if (
+        videoRef.current.currentTime >= activePreviewCandidate.end ||
+        videoRef.current.currentTime < activePreviewCandidate.start
+      ) {
+        videoRef.current.currentTime = activePreviewCandidate.start
+      }
+      videoRef.current
+        .play()
+        .then(() => setIsPlaying(true))
+        .catch(() => setIsPlaying(false))
+    }
+  }
+
+  const handleReplay = () => {
+    if (!videoRef.current || !activePreviewCandidate) return
+    videoRef.current.currentTime = activePreviewCandidate.start
+    setCurrentTime(activePreviewCandidate.start)
+    videoRef.current
+      .play()
+      .then(() => setIsPlaying(true))
+      .catch(() => setIsPlaying(false))
+  }
+
+  const handleTimeUpdate = () => {
+    if (!videoRef.current || !activePreviewCandidate) return
+    const cur = videoRef.current.currentTime
+    setCurrentTime(cur)
+    if (cur >= activePreviewCandidate.end) {
+      videoRef.current.pause()
+      setIsPlaying(false)
+      videoRef.current.currentTime = activePreviewCandidate.start
+      setCurrentTime(activePreviewCandidate.start)
+    }
+  }
+
+  const handleScrub = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newTime = parseFloat(e.target.value)
+    setCurrentTime(newTime)
+    if (videoRef.current) {
+      videoRef.current.currentTime = newTime
+    }
+  }
+
   const [filter, setFilter] = useState<CandidateFilterOption>('all')
   const [sort, setSort] = useState<CandidateSortOption>('score')
   const [isRenderConfirmOpen, setIsRenderConfirmOpen] = useState(false)
@@ -72,7 +149,9 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
     let result = [...project.candidates]
 
     // Quality Gate & Semantic Filtering
-    if (filter === 'publish') {
+    if (filter === 'selected') {
+      result = result.filter((c) => selectedIds.includes(c.candidate_id || c.rank))
+    } else if (filter === 'publish') {
       result = result.filter((c) => c.publishability?.recommendation === 'publish')
     } else if (filter === 'review') {
       result = result.filter((c) => c.publishability?.recommendation === 'review')
@@ -223,6 +302,13 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
               All ({project.candidates.length})
             </button>
             <button
+              className={`btn ${filter === 'selected' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setFilter('selected')}
+              style={{ padding: '4px 10px', fontSize: '0.8rem', color: filter === 'selected' ? '#fff' : 'var(--accent-cyan)' }}
+            >
+              Selected ({selectedIds.length})
+            </button>
+            <button
               className={`btn ${filter === 'publish' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setFilter('publish')}
               style={{ padding: '4px 10px', fontSize: '0.8rem', color: filter === 'publish' ? '#fff' : 'var(--accent-green)' }}
@@ -311,7 +397,7 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
           </div>
 
           <div style={{ fontSize: '0.85rem' }}>
-            <strong style={{ color: 'var(--accent-cyan)' }}>{selectedIds.length}</strong> selected for 9:16 rendering
+            <strong style={{ color: 'var(--accent-cyan)' }}>{selectedIds.length}</strong> selected for {aspectLabel} rendering
           </div>
         </div>
       </div>
@@ -529,6 +615,7 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
                       ? getFileUrl(project.id, `publishing/candidate_${activeCid.toString().padStart(2, '0')}/final.mp4`)
                       : null)
 
+                // Priority 1: Rendered Short MP4
                 if (isRendered && renderedVideoUrl) {
                   return (
                     <div style={{
@@ -577,6 +664,161 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
                   )
                 }
 
+                // Priority 2: Local source.mp4 with scoped window scrubber
+                const hasLocalSource = Boolean(project.has_source_video || project.source_video_url)
+                if (hasLocalSource) {
+                  const sourceVideoSrc = project.source_video_url || getSourceVideoUrl(project.id)
+                  const candDuration = Math.max(0.1, activePreviewCandidate.end - activePreviewCandidate.start)
+                  const relativeProgress = Math.min(Math.max(0, currentTime - activePreviewCandidate.start), candDuration)
+
+                  return (
+                    <div style={{
+                      width: '100%',
+                      borderRadius: 8,
+                      overflow: 'hidden',
+                      background: '#090d16',
+                      border: '1px solid rgba(99, 102, 241, 0.4)',
+                      boxShadow: '0 4px 20px rgba(99, 102, 241, 0.12)',
+                    }}>
+                      <div style={{
+                        padding: '8px 12px',
+                        background: 'rgba(99, 102, 241, 0.1)',
+                        borderBottom: '1px solid rgba(99, 102, 241, 0.2)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
+                          <Video size={14} />
+                          <span>Source Preview (Pre-Render)</span>
+                        </div>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
+                          Window: {formatTime(activePreviewCandidate.start)} → {formatTime(activePreviewCandidate.end)} ({activePreviewCandidate.duration.toFixed(1)}s)
+                        </span>
+                      </div>
+
+                      <video
+                        ref={videoRef}
+                        playsInline
+                        preload="metadata"
+                        src={sourceVideoSrc}
+                        onTimeUpdate={handleTimeUpdate}
+                        onPlay={() => setIsPlaying(true)}
+                        onPause={() => setIsPlaying(false)}
+                        onClick={handlePlayPause}
+                        style={{
+                          width: '100%',
+                          maxHeight: 280,
+                          aspectRatio: '16 / 9',
+                          display: 'block',
+                          background: '#000',
+                          cursor: 'pointer',
+                          objectFit: 'contain',
+                        }}
+                      />
+
+                      {/* Scoped Window Scrubber & Controls */}
+                      <div style={{
+                        padding: '10px 14px',
+                        background: 'rgba(15, 23, 42, 0.85)',
+                        borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 8,
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <button
+                            className="btn btn-secondary"
+                            onClick={handlePlayPause}
+                            title={isPlaying ? 'Pause' : 'Play window'}
+                            style={{ padding: '6px 10px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 4 }}
+                          >
+                            {isPlaying ? <Pause size={14} /> : <Play size={14} />}
+                            <span>{isPlaying ? 'Pause' : 'Play'}</span>
+                          </button>
+                          <button
+                            className="btn btn-secondary"
+                            onClick={handleReplay}
+                            title="Replay candidate window"
+                            style={{ padding: '6px 8px' }}
+                          >
+                            <RotateCcw size={14} />
+                          </button>
+
+                          <input
+                            type="range"
+                            min={activePreviewCandidate.start}
+                            max={activePreviewCandidate.end}
+                            step={0.1}
+                            value={currentTime}
+                            onChange={handleScrub}
+                            style={{
+                              flex: 1,
+                              accentColor: 'var(--accent-primary)',
+                              cursor: 'pointer',
+                            }}
+                          />
+
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', minWidth: 64, textAlign: 'right', fontFamily: 'monospace' }}>
+                            {formatTime(relativeProgress)} / {formatTime(candDuration)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                }
+
+                // Priority 3: YouTube Embed fallback
+                if (project.youtube_video_id) {
+                  const startSec = Math.floor(activePreviewCandidate.start)
+                  const endSec = Math.ceil(activePreviewCandidate.end)
+                  const embedUrl = `https://www.youtube.com/embed/${project.youtube_video_id}?start=${startSec}&end=${endSec}&autoplay=0&rel=0`
+
+                  return (
+                    <div style={{
+                      width: '100%',
+                      borderRadius: 8,
+                      overflow: 'hidden',
+                      background: '#090d16',
+                      border: '1px solid rgba(239, 68, 68, 0.4)',
+                      boxShadow: '0 4px 20px rgba(239, 68, 68, 0.1)',
+                    }}>
+                      <div style={{
+                        padding: '8px 12px',
+                        background: 'rgba(239, 68, 68, 0.08)',
+                        borderBottom: '1px solid rgba(239, 68, 68, 0.2)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', fontWeight: 600, color: '#f87171' }}>
+                          <Video size={14} />
+                          <span>YouTube Stream Preview</span>
+                        </div>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
+                          Window: {formatTime(activePreviewCandidate.start)} → {formatTime(activePreviewCandidate.end)}
+                        </span>
+                      </div>
+                      <iframe
+                        key={`${project.youtube_video_id}-${activePreviewCandidate.rank}-${startSec}-${endSec}`}
+                        src={embedUrl}
+                        title={`YouTube Preview ${activePreviewCandidate.rank}`}
+                        style={{
+                          width: '100%',
+                          height: 240,
+                          border: 'none',
+                          display: 'block',
+                          background: '#000',
+                        }}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                  )
+                }
+
+                // Fallback: Seekable Source Audio player
+                const audioSrc = project.audio_url || getProjectAudioUrl(project.id)
                 return (
                   <div style={{
                     width: '100%',
@@ -605,7 +847,7 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
 
                     <div>
                       <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-main)', marginBottom: 2 }}>
-                        Candidate Awaiting 9:16 Render
+                        Candidate Awaiting {aspectLabel} Render
                       </div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>
                         Source Window: <strong>{formatTime(activePreviewCandidate.start)} → {formatTime(activePreviewCandidate.end)}</strong> ({activePreviewCandidate.duration.toFixed(1)}s)
@@ -613,21 +855,110 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
                     </div>
 
                     {/* Source Audio Preview snippet */}
-                    <div style={{ width: '100%', maxWidth: 300, marginTop: 2 }}>
+                    <div style={{ width: '100%', maxWidth: 320, marginTop: 2 }}>
                       <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                        <Play size={11} /> Source Audio Snippet
+                        <Play size={11} /> Source Audio Snippet (HTTP 206)
                       </div>
                       <audio
+                        ref={audioRef}
                         controls
-                        preload="none"
-                        src={`${getFileUrl(project.id, 'audio.wav')}#t=${activePreviewCandidate.start.toFixed(1)},${activePreviewCandidate.end.toFixed(1)}`}
+                        preload="metadata"
+                        src={`${audioSrc}#t=${activePreviewCandidate.start.toFixed(1)},${activePreviewCandidate.end.toFixed(1)}`}
                         style={{ width: '100%', height: 32 }}
                       />
                     </div>
 
-                    <div style={{ fontSize: '0.74rem', color: 'var(--text-dim)', background: 'rgba(255,255,255,0.04)', padding: '6px 12px', borderRadius: 4, maxWidth: 300 }}>
-                      Select this candidate and click <strong>Render Selected Shorts</strong> below to produce the vertical video with subtitles, effects & SFX.
+                    <div style={{ fontSize: '0.74rem', color: 'var(--text-dim)', background: 'rgba(255,255,255,0.04)', padding: '6px 12px', borderRadius: 4, maxWidth: 320 }}>
+                      Select this candidate and click <strong>Render Selected Shorts</strong> below to produce {aspectLabel} video with subtitles & effects.
                     </div>
+                  </div>
+                )
+              })()}
+
+              {/* Quick Decision Context Box */}
+              {(() => {
+                const activeCid = activePreviewCandidate.candidate_id || activePreviewCandidate.rank
+                const isSelected = selectedIds.includes(activeCid)
+                return (
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 10,
+                    padding: 12,
+                    borderRadius: 8,
+                    background: 'rgba(15, 23, 42, 0.6)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                  }}>
+                    {/* Primary Select Toggle Button */}
+                    <button
+                      className={`btn ${isSelected ? 'btn-secondary' : 'btn-primary'}`}
+                      onClick={() => toggleSelect(activeCid)}
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                        fontWeight: 600,
+                        padding: '10px 14px',
+                        background: isSelected ? 'rgba(34, 197, 94, 0.15)' : undefined,
+                        borderColor: isSelected ? 'rgba(34, 197, 94, 0.5)' : undefined,
+                        color: isSelected ? 'var(--accent-green)' : undefined,
+                      }}
+                    >
+                      {isSelected ? <Check size={16} /> : <Plus size={16} />}
+                      <span>{isSelected ? `Selected for ${aspectLabel} Rendering` : `Select for ${aspectLabel} Rendering`}</span>
+                    </button>
+
+                    {/* Metadata & Event Chips */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                      {activePreviewCandidate.duration_tier && (
+                        <span className="badge badge-cyan" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.72rem' }}>
+                          <Clock size={11} />
+                          {activePreviewCandidate.duration_tier.toUpperCase()}
+                        </span>
+                      )}
+                      {activePreviewCandidate.gameplay_event && (
+                        <span className="badge badge-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.72rem' }}>
+                          <Sparkles size={11} />
+                          {activePreviewCandidate.gameplay_event.replace(/_/g, ' ')}
+                        </span>
+                      )}
+                      {activePreviewCandidate.gameplay_events && activePreviewCandidate.gameplay_events.length > 0 && activePreviewCandidate.gameplay_events.map((ev: any, idx: number) => {
+                        const evName = typeof ev === 'string' ? ev : (ev.event_type || ev.name || JSON.stringify(ev))
+                        return (
+                          <span key={idx} className="badge badge-purple" style={{ fontSize: '0.7rem' }}>
+                            {evName}
+                          </span>
+                        )
+                      })}
+                      {activePreviewCandidate.ranking_reasons && activePreviewCandidate.ranking_reasons.map((reason: string, idx: number) => (
+                        <span key={idx} style={{ fontSize: '0.7rem', color: 'var(--text-dim)', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: 4 }}>
+                          {reason}
+                        </span>
+                      ))}
+                    </div>
+
+                    {/* Spoken Transcript Excerpt */}
+                    {activePreviewCandidate.transcript_excerpt && (
+                      <div style={{
+                        background: 'rgba(0, 0, 0, 0.3)',
+                        borderRadius: 6,
+                        padding: '8px 10px',
+                        borderLeft: '3px solid var(--accent-primary)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 4,
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', color: 'var(--text-dim)', fontWeight: 600 }}>
+                          <MessageSquare size={12} color="var(--accent-primary)" />
+                          <span>Spoken In This Moment:</span>
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: '#e2e8f0', fontStyle: 'italic', lineHeight: 1.4 }}>
+                          "{activePreviewCandidate.transcript_excerpt}"
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )
               })()}
@@ -772,7 +1103,7 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
                 onClick={() => toggleSelect(activePreviewCandidate.rank || activePreviewCandidate.candidate_id)}
                 style={{ marginTop: 6 }}
               >
-                {selectedIds.includes(activePreviewCandidate.rank || activePreviewCandidate.candidate_id) ? 'Deselect Candidate' : 'Select for 9:16 Rendering'}
+                {selectedIds.includes(activePreviewCandidate.rank || activePreviewCandidate.candidate_id) ? 'Deselect Candidate' : `Select for ${aspectLabel} Rendering`}
               </button>
             </div>
           )}
@@ -783,7 +1114,7 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
       <ConfirmDialog
         isOpen={isRenderConfirmOpen}
         title="Render Selected Shorts?"
-        message={`You have selected ${selectedIds.length} candidate moments. The pipeline will render 9:16 vertical video with NVENC hardware acceleration, burn karaoke subtitles & emojis, apply context-aware effects, mix gaming SFX, and assemble complete publishing packages.`}
+        message={`You have selected ${selectedIds.length} candidate moments. The pipeline will render ${aspectLabel} video with NVENC hardware acceleration, burn karaoke subtitles & emojis, apply context-aware effects, mix gaming SFX, and assemble complete publishing packages.`}
         confirmText={`Render ${selectedIds.length} Shorts`}
         onConfirm={() => {
           setIsRenderConfirmOpen(false)
