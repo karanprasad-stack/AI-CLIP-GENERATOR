@@ -34,14 +34,11 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 200,
-      padding: 16,
+      padding: 12,
     }}>
-      <div className="card card-glow animate-modal-in" style={{
-        maxWidth: 460,
-        width: '100%',
+      <div className="card card-glow animate-modal-in w-[calc(100vw-24px)] sm:max-w-[460px] p-4 sm:p-6" style={{
         background: '#0D1322',
         border: '1px solid var(--border-color)',
-        padding: 24,
         boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
@@ -55,6 +52,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               color: isDestructive ? 'var(--accent-red)' : 'var(--accent-cyan)',
+              flexShrink: 0,
             }}>
               <AlertTriangle size={20} />
             </div>
@@ -65,16 +63,16 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           </button>
         </div>
 
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.5, marginBottom: 20 }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', lineHeight: 1.5, marginBottom: 20 }}>
           {message}
         </p>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-          <button className="btn btn-secondary" onClick={onCancel}>
+        <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-2.5">
+          <button className="btn btn-secondary w-full sm:w-auto" onClick={onCancel}>
             {cancelText}
           </button>
           <button
-            className={`btn ${isDestructive ? 'btn-danger' : 'btn-primary'}`}
+            className={`btn ${isDestructive ? 'btn-danger' : 'btn-primary'} w-full sm:w-auto`}
             onClick={onConfirm}
           >
             {confirmText}

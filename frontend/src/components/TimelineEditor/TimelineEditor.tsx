@@ -297,22 +297,18 @@ export const TimelineEditor: React.FC<TimelineEditorProps> = ({
       overflow: 'hidden',
     }}>
       {/* 1. Editor Top Navigation & Action Toolbar */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '10px 20px',
+      <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 sm:px-5" style={{
         borderBottom: '1px solid var(--border-color)',
         background: '#0f172a',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <span className="badge badge-purple" style={{ fontSize: '0.85rem' }}>
             SHORT #{candidateId} TIMELINE EDL
           </span>
           <span className="badge badge-cyan" style={{ fontSize: '0.75rem' }}>
             v{timeline.version}
           </span>
-          <span style={{ fontSize: '0.9rem', color: 'var(--text-dim)' }}>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>
             Duration: <strong style={{ color: 'var(--text-main)' }}>{duration.toFixed(2)}s</strong>
           </span>
 
@@ -352,7 +348,7 @@ export const TimelineEditor: React.FC<TimelineEditorProps> = ({
         </div>
 
         {/* Right Action Buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <button
             className="btn btn-secondary"
             onClick={handleUndo}
@@ -376,20 +372,21 @@ export const TimelineEditor: React.FC<TimelineEditorProps> = ({
             className="btn btn-secondary"
             onClick={handleSave}
             disabled={saveStatus === 'saving'}
-            style={{ padding: '6px 14px', fontSize: '0.85rem' }}
+            style={{ padding: '6px 12px', fontSize: '0.82rem' }}
           >
             <Save size={15} />
-            <span>Save Timeline</span>
+            <span className="hidden sm:inline">Save Timeline</span>
+            <span className="sm:hidden">Save</span>
           </button>
 
           <button
             className="btn btn-primary"
             onClick={handleRender}
             disabled={isRendering}
-            style={{ padding: '6px 18px', fontSize: '0.85rem', background: 'var(--gradient-primary)' }}
+            style={{ padding: '6px 14px', fontSize: '0.82rem', background: 'var(--gradient-primary)' }}
           >
             <Film size={15} />
-            <span>{isRendering ? 'Rendering...' : 'Render Final Video'}</span>
+            <span>{isRendering ? 'Rendering...' : 'Render Video'}</span>
           </button>
 
           <button
@@ -420,15 +417,7 @@ export const TimelineEditor: React.FC<TimelineEditorProps> = ({
       )}
 
       {/* 2. Top Half Workspace: Video Preview Left, Inspector Right */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(280px, 420px) minmax(0, 1fr)',
-        gap: 16,
-        padding: '16px 20px',
-        flex: '0 0 auto',
-        maxHeight: '44vh',
-        background: '#090d16',
-      }}>
+      <div className="timeline-preview-grid">
         {/* Left: 9:16 Video Player Card */}
         <div className="card" style={{
           display: 'flex',
@@ -533,15 +522,17 @@ export const TimelineEditor: React.FC<TimelineEditorProps> = ({
         {/* Scrollable Timeline Grid */}
         <div
           ref={timelineRulerRef}
+          className="touch-pan-x"
           style={{
             flex: 1,
             overflowX: 'auto',
             overflowY: 'auto',
             position: 'relative',
             background: '#070b13',
+            WebkitOverflowScrolling: 'touch',
           }}
         >
-          <div style={{ width: timelineWidth + 180, minHeight: '100%', position: 'relative' }}>
+          <div style={{ width: Math.max(640, timelineWidth + 180), minHeight: '100%', position: 'relative' }}>
             {/* Playhead Red Needle */}
             <div
               style={{
@@ -585,7 +576,7 @@ export const TimelineEditor: React.FC<TimelineEditorProps> = ({
                 cursor: 'pointer',
               }}
             >
-              <div style={{ width: 140, paddingLeft: 12, fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-dim)' }}>
+              <div style={{ position: 'sticky', left: 0, zIndex: 25, background: '#0d1322', width: 140, flexShrink: 0, paddingLeft: 12, fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-dim)', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
                 TIMECODE
               </div>
               <div style={{ position: 'relative', flex: 1, height: '100%' }}>
@@ -617,7 +608,7 @@ export const TimelineEditor: React.FC<TimelineEditorProps> = ({
             <div style={{ display: 'flex', borderBottom: '1px solid #1e293b', minHeight: 38, alignItems: 'center' }}>
               <div
                 onClick={() => setSelection({ type: 'boundaries', item: timeline.boundaries })}
-                style={{ width: 140, paddingLeft: 12, fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+                style={{ position: 'sticky', left: 0, zIndex: 20, background: '#070b13', width: 140, flexShrink: 0, paddingLeft: 12, fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', borderRight: '1px solid rgba(255,255,255,0.04)' }}
               >
                 <Sliders size={13} color="var(--text-main)" />
                 <span>Boundaries</span>
@@ -644,7 +635,7 @@ export const TimelineEditor: React.FC<TimelineEditorProps> = ({
 
             {/* Track 2: VIDEO */}
             <div style={{ display: 'flex', borderBottom: '1px solid #1e293b', minHeight: 38, alignItems: 'center' }}>
-              <div style={{ width: 140, paddingLeft: 12, fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ position: 'sticky', left: 0, zIndex: 20, background: '#070b13', width: 140, flexShrink: 0, paddingLeft: 12, fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6, borderRight: '1px solid rgba(255,255,255,0.04)' }}>
                 <Film size={13} color="var(--accent-cyan)" />
                 <span>{timeline.video_track.aspect_ratio === '1:1' ? 'Video 1:1' : 'Video 9:16'}</span>
               </div>
@@ -700,7 +691,7 @@ export const TimelineEditor: React.FC<TimelineEditorProps> = ({
 
             {/* Track 3: SUBTITLES */}
             <div style={{ display: 'flex', borderBottom: '1px solid #1e293b', minHeight: 46, alignItems: 'center' }}>
-              <div style={{ width: 140, paddingLeft: 12, fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ position: 'sticky', left: 0, zIndex: 20, background: '#070b13', width: 140, flexShrink: 0, paddingLeft: 12, fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6, borderRight: '1px solid rgba(255,255,255,0.04)' }}>
                 <Type size={13} color="var(--accent-cyan)" />
                 <span>Subtitles ({timeline.subtitles_track.length})</span>
               </div>
@@ -749,7 +740,7 @@ export const TimelineEditor: React.FC<TimelineEditorProps> = ({
 
             {/* Track 4: EMOJIS */}
             <div style={{ display: 'flex', borderBottom: '1px solid #1e293b', minHeight: 40, alignItems: 'center' }}>
-              <div style={{ width: 140, paddingLeft: 12, fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ position: 'sticky', left: 0, zIndex: 20, background: '#070b13', width: 140, flexShrink: 0, paddingLeft: 12, fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6, borderRight: '1px solid rgba(255,255,255,0.04)' }}>
                 <Smile size={13} color="var(--accent-amber)" />
                 <span>Emojis ({timeline.emoji_track.length})</span>
               </div>
@@ -793,7 +784,7 @@ export const TimelineEditor: React.FC<TimelineEditorProps> = ({
 
             {/* Track 5: VISUAL EFFECTS */}
             <div style={{ display: 'flex', borderBottom: '1px solid #1e293b', minHeight: 42, alignItems: 'center' }}>
-              <div style={{ width: 140, paddingLeft: 12, fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ position: 'sticky', left: 0, zIndex: 20, background: '#070b13', width: 140, flexShrink: 0, paddingLeft: 12, fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6, borderRight: '1px solid rgba(255,255,255,0.04)' }}>
                 <Sparkles size={13} color="var(--accent-purple)" />
                 <span>Effects ({timeline.effects_track.length})</span>
               </div>
@@ -840,7 +831,7 @@ export const TimelineEditor: React.FC<TimelineEditorProps> = ({
 
             {/* Track 6: SFX */}
             <div style={{ display: 'flex', borderBottom: '1px solid #1e293b', minHeight: 42, alignItems: 'center' }}>
-              <div style={{ width: 140, paddingLeft: 12, fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ position: 'sticky', left: 0, zIndex: 20, background: '#070b13', width: 140, flexShrink: 0, paddingLeft: 12, fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6, borderRight: '1px solid rgba(255,255,255,0.04)' }}>
                 <Volume2 size={13} color="var(--accent-green)" />
                 <span>SFX ({timeline.sfx_track.length})</span>
               </div>
@@ -888,7 +879,7 @@ export const TimelineEditor: React.FC<TimelineEditorProps> = ({
 
             {/* Track 7: DUCKING */}
             <div style={{ display: 'flex', minHeight: 40, alignItems: 'center' }}>
-              <div style={{ width: 140, paddingLeft: 12, fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ position: 'sticky', left: 0, zIndex: 20, background: '#070b13', width: 140, flexShrink: 0, paddingLeft: 12, fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6, borderRight: '1px solid rgba(255,255,255,0.04)' }}>
                 <Mic size={13} color="#38bdf8" />
                 <span>Ducking ({timeline.ducking_track.length})</span>
               </div>

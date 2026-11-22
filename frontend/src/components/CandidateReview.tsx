@@ -74,6 +74,7 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
   // Pre-render video & audio player state
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const previewAnchorRef = useRef<HTMLDivElement | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(activePreviewCandidate?.start || 0)
   const [sourceVideoError, setSourceVideoError] = useState(false)
@@ -226,6 +227,13 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
     }
   }
 
+  const handleCardClick = (id: number) => {
+    setActivePreviewId(id)
+    if (typeof window !== 'undefined' && window.innerWidth < 1024 && previewAnchorRef.current) {
+      previewAnchorRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Top Header */}
@@ -313,62 +321,62 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
       {/* Control Bar: Filters, Sorting & Selection Toolbar */}
       <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '16px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14 }}>
-          {/* Filter Pills */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+          {/* Filter Pills - single-row horizontally scrollable on mobile */}
+          <div className="flex items-center gap-2 flex-nowrap overflow-x-auto hide-scrollbar py-1 w-full lg:w-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
               <Filter size={14} /> Gate Filter:
             </span>
             <button
-              className={`btn ${filter === 'all' ? 'btn-primary' : 'btn-secondary'}`}
+              className={`btn shrink-0 whitespace-nowrap ${filter === 'all' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setFilter('all')}
               style={{ padding: '4px 10px', fontSize: '0.8rem' }}
             >
               All ({project.candidates.length})
             </button>
             <button
-              className={`btn ${filter === 'selected' ? 'btn-primary' : 'btn-secondary'}`}
+              className={`btn shrink-0 whitespace-nowrap ${filter === 'selected' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setFilter('selected')}
               style={{ padding: '4px 10px', fontSize: '0.8rem', color: filter === 'selected' ? '#fff' : 'var(--accent-cyan)' }}
             >
               Selected ({selectedIds.length})
             </button>
             <button
-              className={`btn ${filter === 'publish' ? 'btn-primary' : 'btn-secondary'}`}
+              className={`btn shrink-0 whitespace-nowrap ${filter === 'publish' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setFilter('publish')}
               style={{ padding: '4px 10px', fontSize: '0.8rem', color: filter === 'publish' ? '#fff' : 'var(--accent-green)' }}
             >
               Publish ({publishCount})
             </button>
             <button
-              className={`btn ${filter === 'review' ? 'btn-primary' : 'btn-secondary'}`}
+              className={`btn shrink-0 whitespace-nowrap ${filter === 'review' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setFilter('review')}
               style={{ padding: '4px 10px', fontSize: '0.8rem', color: filter === 'review' ? '#fff' : 'var(--accent-amber)' }}
             >
               Review ({reviewCount})
             </button>
             <button
-              className={`btn ${filter === 'reject' ? 'btn-primary' : 'btn-secondary'}`}
+              className={`btn shrink-0 whitespace-nowrap ${filter === 'reject' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setFilter('reject')}
               style={{ padding: '4px 10px', fontSize: '0.8rem', color: filter === 'reject' ? '#fff' : '#f87171' }}
             >
               Reject ({rejectCount})
             </button>
             <button
-              className={`btn ${filter === 'strong' ? 'btn-primary' : 'btn-secondary'}`}
+              className={`btn shrink-0 whitespace-nowrap ${filter === 'strong' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setFilter('strong')}
               style={{ padding: '4px 10px', fontSize: '0.8rem' }}
             >
               Strong Moment (≥70) ({strongMomentsCount})
             </button>
             <button
-              className={`btn ${filter === 'combat' ? 'btn-primary' : 'btn-secondary'}`}
+              className={`btn shrink-0 whitespace-nowrap ${filter === 'combat' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setFilter('combat')}
               style={{ padding: '4px 10px', fontSize: '0.8rem' }}
             >
               Combat & Clutches
             </button>
             <button
-              className={`btn ${filter === 'funny' ? 'btn-primary' : 'btn-secondary'}`}
+              className={`btn shrink-0 whitespace-nowrap ${filter === 'funny' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setFilter('funny')}
               style={{ padding: '4px 10px', fontSize: '0.8rem' }}
             >
@@ -377,7 +385,7 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
           </div>
 
           {/* Sort Dropdown */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
               <SlidersHorizontal size={14} /> Sort:
             </span>
@@ -395,32 +403,32 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
           </div>
         </div>
 
-        {/* Quick Selection Buttons */}
+        {/* Quick Selection Buttons - single-row horizontally scrollable on mobile */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, paddingTop: 10, borderTop: '1px solid var(--border-color)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>Selection:</span>
-            <button className="btn btn-secondary" onClick={selectRecommended} style={{ padding: '4px 10px', fontSize: '0.75rem' }}>
+          <div className="flex items-center gap-2 flex-nowrap overflow-x-auto hide-scrollbar py-1 w-full lg:w-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)', flexShrink: 0 }}>Selection:</span>
+            <button className="btn shrink-0 whitespace-nowrap btn-secondary" onClick={selectRecommended} style={{ padding: '4px 10px', fontSize: '0.75rem' }}>
               Publish-Ready ({publishCount > 0 ? publishCount : project.long_stream_info?.recommended_shorts || 5})
             </button>
-            <button className="btn btn-secondary" onClick={() => selectTopN(3)} style={{ padding: '4px 10px', fontSize: '0.75rem' }}>
+            <button className="btn shrink-0 whitespace-nowrap btn-secondary" onClick={() => selectTopN(3)} style={{ padding: '4px 10px', fontSize: '0.75rem' }}>
               Top 3
             </button>
-            <button className="btn btn-secondary" onClick={() => selectTopN(5)} style={{ padding: '4px 10px', fontSize: '0.75rem' }}>
+            <button className="btn shrink-0 whitespace-nowrap btn-secondary" onClick={() => selectTopN(5)} style={{ padding: '4px 10px', fontSize: '0.75rem' }}>
               Top 5
             </button>
             <button
-              className="btn btn-secondary"
+              className="btn shrink-0 whitespace-nowrap btn-secondary"
               onClick={() => setSelectedIds(project.candidates.map((c) => c.rank || c.candidate_id))}
               style={{ padding: '4px 10px', fontSize: '0.75rem' }}
             >
               Select All
             </button>
-            <button className="btn btn-secondary" onClick={() => setSelectedIds([])} style={{ padding: '4px 10px', fontSize: '0.75rem' }}>
+            <button className="btn shrink-0 whitespace-nowrap btn-secondary" onClick={() => setSelectedIds([])} style={{ padding: '4px 10px', fontSize: '0.75rem' }}>
               Clear
             </button>
           </div>
 
-          <div style={{ fontSize: '0.85rem' }}>
+          <div style={{ fontSize: '0.85rem', flexShrink: 0 }}>
             <strong style={{ color: 'var(--accent-cyan)' }}>{selectedIds.length}</strong> selected for {aspectLabel} rendering
           </div>
         </div>
@@ -436,9 +444,9 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
           onAction={() => setFilter('all')}
         />
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(360px, 1fr)', gap: 24, alignItems: 'start' }}>
-          {/* Left: Candidate Cards List */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="candidate-review-grid">
+          {/* Candidate Cards List */}
+          <div className="candidate-list-col" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {processedCandidates.map((c) => {
               const id = c.candidate_id || c.rank
               const isSelected = selectedIds.includes(id)
@@ -450,11 +458,11 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
                 <div
                   key={id}
                   className={`card ${isActive ? 'card-glow card-active' : ''}`}
-                  onClick={() => setActivePreviewId(id)}
+                  onClick={() => handleCardClick(id)}
                   style={{
                     display: 'flex',
-                    gap: 16,
-                    padding: 18,
+                    gap: 14,
+                    padding: '16px 14px',
                     cursor: 'pointer',
                     borderColor: isActive ? 'var(--accent-cyan)' : (isSelected ? 'rgba(34, 211, 238, 0.45)' : 'var(--border-color)'),
                     background: isActive ? 'rgba(19, 28, 49, 0.95)' : 'var(--bg-card)',
@@ -574,14 +582,7 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
 
                     {/* 6 Creator Dimensions Breakdown */}
                     {pub?.dimensions && (
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(6, 1fr)',
-                        gap: 6,
-                        background: 'rgba(0,0,0,0.35)',
-                        padding: '6px 10px',
-                        borderRadius: 6,
-                      }}>
+                      <div className="score-grid-responsive">
                         <ScoreBar label="Moment" score={pub.dimensions.moment ?? 0} />
                         <ScoreBar label="Narrative" score={pub.dimensions.narrative ?? 0} />
                         <ScoreBar label="Visual/Audio" score={pub.dimensions.presentation ?? 0} />
@@ -620,21 +621,22 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
             })}
           </div>
 
-          {/* Right: Selected Candidate Preview & Creator Quality Auditor Card */}
+          {/* Candidate Preview & Creator Quality Auditor Panel */}
           {activePreviewCandidate && (
-            <div className="card card-glow" style={{ position: 'sticky', top: 90, display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>
-                  Candidate #{activePreviewCandidate.rank} Audit & Preview
-                </h3>
-                {activePreviewCandidate.publishability && (
-                  <span className={`badge ${activePreviewCandidate.publishability.recommendation === 'publish' ? 'badge-green' : (activePreviewCandidate.publishability.recommendation === 'review' ? 'badge-amber' : 'badge-red')}`}>
-                    {activePreviewCandidate.publishability.recommendation.toUpperCase()}
-                  </span>
-                )}
-              </div>
+            <div className="candidate-preview-panel" ref={previewAnchorRef}>
+              <div className="card card-glow" style={{ position: 'sticky', top: 76, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>
+                    Candidate #{activePreviewCandidate.rank} Audit & Preview
+                  </h3>
+                  {activePreviewCandidate.publishability && (
+                    <span className={`badge ${activePreviewCandidate.publishability.recommendation === 'publish' ? 'badge-green' : (activePreviewCandidate.publishability.recommendation === 'review' ? 'badge-amber' : 'badge-red')}`}>
+                      {activePreviewCandidate.publishability.recommendation.toUpperCase()}
+                    </span>
+                  )}
+                </div>
 
-              {/* Video Player or Pre-Render Preview Card */}
+                {/* Video Player or Pre-Render Preview Card */}
               {(() => {
                 const activeCid = activePreviewCandidate.candidate_id || activePreviewCandidate.rank
                 const matchingPkg = project.published_packages?.find((pkg) => pkg.candidate_id === activeCid)
@@ -682,14 +684,9 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
                         preload="metadata"
                         key={renderedVideoUrl}
                         src={renderedVideoUrl}
+                        className="w-full max-h-[55vh] max-w-[320px] mx-auto block object-contain bg-black"
                         style={{
-                          width: '100%',
-                          maxHeight: 380,
                           aspectRatio: activePreviewCandidate.aspect_ratio === '1:1' || project.settings?.aspect_ratio === '1:1' ? '1 / 1' : '9 / 16',
-                          display: 'block',
-                          margin: '0 auto',
-                          background: '#000',
-                          objectFit: 'contain',
                         }}
                       >
                         Your browser does not support video preview.
@@ -1231,9 +1228,32 @@ export const CandidateReview: React.FC<CandidateReviewProps> = ({
                 {selectedIds.includes(activePreviewCandidate.rank || activePreviewCandidate.candidate_id) ? 'Deselect Candidate' : `Select for ${aspectLabel} Rendering`}
               </button>
             </div>
-          )}
+          </div>
+        )}
+      </div>
+    )}
+
+      {/* Sticky Mobile Bottom Action Bar (< 1024px) */}
+      <div className="mobile-sticky-bar">
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' }}>
+            <span style={{ color: 'var(--accent-cyan)' }}>{selectedIds.length}</span> selected
+          </span>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>
+            {aspectLabel} Shorts rendering
+          </span>
         </div>
-      )}
+
+        <button
+          className="btn btn-primary"
+          onClick={() => setIsRenderConfirmOpen(true)}
+          disabled={selectedIds.length === 0}
+          style={{ padding: '8px 18px', fontSize: '0.85rem' }}
+        >
+          <span>Render Selected</span>
+          <ArrowRight size={15} />
+        </button>
+      </div>
 
       {/* Render Confirmation Modal */}
       <ConfirmDialog

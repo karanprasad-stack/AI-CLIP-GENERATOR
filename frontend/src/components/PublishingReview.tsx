@@ -309,15 +309,15 @@ export const PublishingReview: React.FC<PublishingReviewProps> = ({
       </div>
 
       {/* Candidate Tabs Bar */}
-      <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 6 }}>
+      <div className="flex gap-2.5 overflow-x-auto hide-scrollbar pb-1.5" style={{ WebkitOverflowScrolling: 'touch' }}>
         {packages.map((pkg, idx) => {
           const isSelected = idx === selectedIdx
           return (
             <button
               key={pkg.candidate_id}
               onClick={() => setSelectedIdx(idx)}
-              className={`btn ${isSelected ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ padding: '8px 16px', whiteSpace: 'nowrap' }}
+              className={`btn shrink-0 whitespace-nowrap ${isSelected ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ padding: '8px 16px' }}
             >
               <span>Short #{pkg.candidate_id}</span>
               <span className="badge badge-cyan" style={{ fontSize: '0.7rem', padding: '1px 5px', background: 'rgba(0,0,0,0.3)' }}>
@@ -328,8 +328,8 @@ export const PublishingReview: React.FC<PublishingReviewProps> = ({
         })}
       </div>
 
-      {/* Main 2-Column Workspace: Video Player Left, Metadata Editor Right */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 420px) minmax(0, 1fr)', gap: 28, alignItems: 'start' }}>
+      {/* Main Responsive Workspace: Video Player Left, Metadata Editor Right */}
+      <div className="publishing-review-grid">
         {/* Left Column: Vertical 9:16 Shorts Player & Thumbnail Preview */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Vertical Video Card */}
@@ -353,6 +353,7 @@ export const PublishingReview: React.FC<PublishingReviewProps> = ({
               <video
                 controls
                 src={videoUrl}
+                className="w-full max-h-[55vh] max-w-[300px] mx-auto block object-contain"
                 style={{ width: '100%', height: '100%', objectFit: 'contain' }}
               >
                 Your browser does not support vertical video preview.
@@ -790,8 +791,8 @@ export const PublishingReview: React.FC<PublishingReviewProps> = ({
               })}
             </div>
 
-            {/* Settings Row: Privacy & Scheduling */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+            {/* Settings Row: Privacy & Scheduling - responsive stack on mobile */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3.5">
               <div>
                 <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-dim)', marginBottom: 6 }}>
                   Upload Privacy Level
@@ -823,15 +824,10 @@ export const PublishingReview: React.FC<PublishingReviewProps> = ({
             </div>
 
             {/* Dry Run Checkbox Toggle */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '10px 12px',
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-2.5 sm:p-3 mb-3.5" style={{
               borderRadius: 6,
               background: 'rgba(255, 255, 255, 0.03)',
               border: '1px solid var(--border-color)',
-              marginBottom: 14,
             }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
                 <input

@@ -93,11 +93,7 @@ export const LiveProgress: React.FC<LiveProgressProps> = ({
       </div>
 
       {/* Long-Stream Architecture Metric Box */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-        gap: 16,
-      }}>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         <div className="card" style={{ padding: '14px 18px' }}>
           <div style={{ color: 'var(--text-dim)', fontSize: '0.74rem', fontWeight: 600 }}>SOURCE DURATION</div>
           <div className="font-mono tabular-nums" style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)', marginTop: 4 }}>
@@ -245,7 +241,7 @@ export const LiveProgress: React.FC<LiveProgressProps> = ({
             <div style={{ color: 'var(--text-dim)' }}>Waiting for pipeline logs...</div>
           ) : (
             progress.logs.map((log, index) => (
-              <div key={index} style={{ wordBreak: 'break-word' }}>{log}</div>
+              <div key={index} style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>{log}</div>
             ))
           )}
         </div>

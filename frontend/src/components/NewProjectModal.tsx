@@ -77,36 +77,33 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 100,
-      padding: 16,
+      padding: 8,
     }}>
-      <div className="card card-glow animate-modal-in" style={{
-        maxWidth: 720,
-        width: '100%',
-        maxHeight: '94vh',
-        overflowY: 'auto',
+      <div className="card card-glow animate-modal-in w-[calc(100vw-16px)] sm:max-w-[720px] max-h-[92dvh] flex flex-col p-4 sm:p-7" style={{
         background: '#0D1322',
         border: '1px solid var(--border-color)',
-        padding: 28,
         boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
+        overflow: 'hidden',
       }}>
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 22 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{
-              width: 38,
-              height: 38,
+              width: 36,
+              height: 36,
               borderRadius: 10,
               background: 'linear-gradient(135deg, #00f2fe 0%, #4facfe 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               color: '#050b14',
+              flexShrink: 0,
             }}>
-              <Video size={22} />
+              <Video size={20} />
             </div>
             <div>
-              <h2 style={{ fontSize: '1.3rem', fontWeight: 800 }}>Create New Shorts Project</h2>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Automated gaming moment detection & 9:16 Shorts cropping</p>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 800 }}>Create New Shorts Project</h2>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Automated gaming moment detection & 9:16 Shorts cropping</p>
             </div>
           </div>
           <button className="btn btn-secondary" onClick={onClose} style={{ padding: 6, borderRadius: '50%' }}>
@@ -114,13 +111,13 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4 overflow-y-auto pr-1" style={{ WebkitOverflowScrolling: 'touch' }}>
           {/* Dual Source Mode Selector */}
           <div>
             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 8 }}>
               Source Type
             </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => setSourceType('normal_video')}
@@ -247,7 +244,7 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
           </div>
 
           {/* Duration & Shorts Count Controls */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             {/* Duration Preset */}
             <div>
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 6 }}>
@@ -294,7 +291,7 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
 
           {/* Custom Duration Inputs if selected */}
           {settings.duration_mode === 'custom' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, background: 'rgba(0,0,0,0.25)', padding: 12, borderRadius: 8 }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5" style={{ background: 'rgba(0,0,0,0.25)', padding: 12, borderRadius: 8 }}>
               <div>
                 <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Min Duration (seconds)</label>
                 <input
@@ -598,15 +595,15 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
           </div>
 
           {/* Submit Actions */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
-            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={isSubmitting}>
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2.5 sm:gap-3 mt-2 pt-2 border-t border-white/5">
+            <button type="button" className="btn btn-secondary w-full sm:w-auto" onClick={onClose} disabled={isSubmitting}>
               Cancel
             </button>
             <button
               type="submit"
-              className="btn btn-primary"
+              className="btn btn-primary w-full sm:w-auto"
               disabled={isSubmitting || !url.trim()}
-              style={{ padding: '10px 26px', fontSize: '0.95rem' }}
+              style={{ padding: '10px 24px', fontSize: '0.92rem' }}
             >
               <Sparkles size={18} />
               <span>{isSubmitting ? 'Starting Analysis...' : 'Analyze Video'}</span>

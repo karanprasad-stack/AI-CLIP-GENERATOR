@@ -55,7 +55,7 @@ export const ProjectHistory: React.FC<ProjectHistoryProps> = ({
       {/* Hero Section */}
       <div className="card card-glow" style={{
         background: 'linear-gradient(135deg, rgba(13, 19, 34, 0.95) 0%, rgba(19, 28, 49, 0.88) 100%)',
-        padding: '36px 36px',
+        padding: '24px 20px',
         position: 'relative',
         overflow: 'hidden',
         border: '1px solid rgba(148, 163, 184, 0.15)',
@@ -72,9 +72,8 @@ export const ProjectHistory: React.FC<ProjectHistoryProps> = ({
         }} />
 
         <div style={{ maxWidth: 740, position: 'relative', zIndex: 1 }}>
-          <span className="badge badge-cyan" style={{ marginBottom: 14 }}>LOCAL-FIRST CREATOR STUDIO</span>
-          <h1 style={{
-            fontSize: '2.2rem',
+          <span className="badge badge-cyan" style={{ marginBottom: 12 }}>LOCAL-FIRST CREATOR STUDIO</span>
+          <h1 className="text-2xl sm:text-4xl" style={{
             fontWeight: 800,
             lineHeight: 1.25,
             letterSpacing: '-0.025em',
@@ -82,16 +81,16 @@ export const ProjectHistory: React.FC<ProjectHistoryProps> = ({
           }}>
             Turn gaming streams into <span className="text-gradient-cyan">publish-ready Shorts</span> automatically.
           </h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.98rem', lineHeight: 1.6, marginBottom: 24 }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem', lineHeight: 1.6, marginBottom: 20 }}>
             Local Whisper speech transcription, game event computer vision, karaoke subtitles, and multi-tier previewing — 100% free with zero cloud dependencies.
           </p>
 
-          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-            <button className="btn btn-primary" onClick={onNewProject} style={{ padding: '11px 26px', fontSize: '0.95rem' }}>
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center">
+            <button className="btn btn-primary w-full sm:w-auto" onClick={onNewProject} style={{ padding: '11px 24px', fontSize: '0.92rem' }}>
               <Sparkles size={18} />
               <span>+ New Project</span>
             </button>
-            <div style={{ display: 'flex', gap: 14, fontSize: '0.85rem', color: 'var(--text-dim)', paddingLeft: 6 }}>
+            <div style={{ display: 'flex', gap: 12, fontSize: '0.85rem', color: 'var(--text-dim)', paddingLeft: 4, flexWrap: 'wrap' }}>
               <span>Projects: <strong className="font-mono tabular-nums" style={{ color: 'var(--text-main)' }}>{projects.length}</strong></span>
               <span>•</span>
               <span>Published Shorts: <strong className="font-mono tabular-nums" style={{ color: 'var(--accent-cyan)' }}>{totalShorts}</strong></span>
@@ -106,9 +105,9 @@ export const ProjectHistory: React.FC<ProjectHistoryProps> = ({
         alignItems: 'center',
         justifyContent: 'space-between',
         flexWrap: 'wrap',
-        gap: 14,
+        gap: 12,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, maxWidth: 460 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 260, maxWidth: 460 }}>
           <div style={{ position: 'relative', width: '100%' }}>
             <Search size={16} color="var(--text-dim)" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)' }} />
             <input
@@ -137,11 +136,7 @@ export const ProjectHistory: React.FC<ProjectHistoryProps> = ({
           onAction={searchQuery ? () => setSearchQuery('') : onNewProject}
         />
       ) : (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
-          gap: 22,
-        }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {filteredProjects.map((proj) => {
             const isCompleted = proj.status === 'completed'
             const isAnalyzing = proj.status === 'analyzing' || proj.status === 'rendering'

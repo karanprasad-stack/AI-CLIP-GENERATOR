@@ -90,33 +90,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 100,
-      padding: 16,
+      padding: 8,
     }}>
-      <div className="card card-glow animate-modal-in" style={{
-        maxWidth: 680,
-        width: '100%',
-        maxHeight: '90vh',
-        overflowY: 'auto',
+      <div className="card card-glow animate-modal-in w-[calc(100vw-16px)] sm:max-w-[680px] max-h-[92dvh] flex flex-col p-4 sm:p-6" style={{
         position: 'relative',
         background: 'var(--bg-secondary)',
         border: '1px solid var(--border-color)',
-        padding: 24,
+        overflow: 'hidden',
       }}>
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Sliders size={20} color="var(--accent-cyan)" />
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Engine & Hardware Preferences</h2>
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 700 }}>Engine & Hardware Preferences</h2>
           </div>
           <button className="btn btn-secondary" onClick={onClose} style={{ padding: 6, borderRadius: '50%' }}>
             <X size={18} />
           </button>
         </div>
 
-        {/* Tab Navigation */}
-        <div style={{ display: 'flex', gap: 8, borderBottom: '1px solid var(--border-color)', paddingBottom: 10, marginBottom: 20 }}>
+        {/* Tab Navigation - horizontally scrollable on mobile */}
+        <div className="flex gap-2 border-b border-white/10 pb-2.5 mb-4 overflow-x-auto hide-scrollbar whitespace-nowrap shrink-0" style={{ WebkitOverflowScrolling: 'touch' }}>
           <button
-            className={`btn ${activeTab === 'general' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`btn shrink-0 whitespace-nowrap ${activeTab === 'general' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setActiveTab('general')}
             style={{ padding: '6px 14px', fontSize: '0.85rem' }}
           >
@@ -124,7 +120,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <span>General</span>
           </button>
           <button
-            className={`btn ${activeTab === 'subtitles' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`btn shrink-0 whitespace-nowrap ${activeTab === 'subtitles' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setActiveTab('subtitles')}
             style={{ padding: '6px 14px', fontSize: '0.85rem' }}
           >
@@ -132,7 +128,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <span>Subtitles & Hinglish</span>
           </button>
           <button
-            className={`btn ${activeTab === 'audio' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`btn shrink-0 whitespace-nowrap ${activeTab === 'audio' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setActiveTab('audio')}
             style={{ padding: '6px 14px', fontSize: '0.85rem' }}
           >
@@ -140,7 +136,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <span>Audio & SFX</span>
           </button>
           <button
-            className={`btn ${activeTab === 'hardware' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`btn shrink-0 whitespace-nowrap ${activeTab === 'hardware' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setActiveTab('hardware')}
             style={{ padding: '6px 14px', fontSize: '0.85rem' }}
           >
@@ -148,7 +144,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <span>GPU / NVENC</span>
           </button>
           <button
-            className={`btn ${activeTab === 'publishing' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`btn shrink-0 whitespace-nowrap ${activeTab === 'publishing' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => {
               setActiveTab('publishing')
               loadPlatforms()
@@ -159,6 +155,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <span>Publishing Accounts</span>
           </button>
         </div>
+
+        {/* Scrollable Tab Content Container */}
+        <div className="overflow-y-auto flex-1 pr-1" style={{ WebkitOverflowScrolling: 'touch' }}>
 
         {/* Tab 1: General */}
         {activeTab === 'general' && (
@@ -551,12 +550,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
         )}
+        </div>
 
         {/* Footer Actions */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--border-color)' }}>
-          <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
+        <div className="flex flex-col-reverse sm:flex-row justify-end gap-2.5 sm:gap-3 mt-4 pt-3 border-t border-white/10 shrink-0">
+          <button className="btn btn-secondary w-full sm:w-auto" onClick={onClose}>Cancel</button>
           <button
-            className="btn btn-primary"
+            className="btn btn-primary w-full sm:w-auto"
             onClick={() => {
               onSave(localSettings)
               onClose()

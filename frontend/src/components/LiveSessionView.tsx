@@ -249,12 +249,8 @@ export const LiveSessionView: React.FC<LiveSessionViewProps> = ({
       </div>
 
       {/* Telemetry Metric Cards */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-        gap: 16,
-      }}>
-        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '18px 20px' }}>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 18px' }}>
           <div style={{
             width: 44,
             height: 44,
@@ -348,7 +344,7 @@ export const LiveSessionView: React.FC<LiveSessionViewProps> = ({
       </div>
 
       {/* Main Grid: Activity Feed & Detected Candidates */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 380px) 1fr', gap: 20 }}>
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(300px,360px)_1fr] gap-5">
         {/* Live Activity Feed */}
         <div className="card" style={{ display: 'flex', flexDirection: 'column', maxHeight: 600 }}>
           <div style={{
