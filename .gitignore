@@ -46,3 +46,16 @@ config/credentials/
 Thumbs.db
 .vscode/
 .idea/
+
+# Android & Capacitor Build Artifacts
+frontend/android/app/build/
+frontend/android/.gradle/
+frontend/android/build/
+frontend/android/captures/
+frontend/android/local.properties
+frontend/android/*.iml
+frontend/android/app/*.iml
+*.apk
+*.aab
+*.keystore
+

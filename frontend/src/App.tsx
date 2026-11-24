@@ -18,6 +18,8 @@ import {
   startRender,
   cancelJob,
   subscribeProjectEvents,
+  testServerConnection,
+  getApiBaseUrl,
 } from './api/client'
 import type { ProjectSummary, ProjectDetail, ProcessingSettings, SourceType } from './types'
 
@@ -57,6 +59,19 @@ export function App() {
   const [settings, setSettings] = useState<ProcessingSettings>(DEFAULT_SETTINGS)
   const [isBackendConnected, setIsBackendConnected] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showMobileServerBanner, setShowMobileServerBanner] = useState(false)
+
+  useEffect(() => {
+    // Check if running in a native mobile shell (Capacitor) without a configured server URL
+    const isCapacitor =
+      typeof (window as any).Capacitor !== 'undefined' &&
+      typeof (window as any).Capacitor.isNativePlatform === 'function' &&
+      (window as any).Capacitor.isNativePlatform()
+
+    if (isCapacitor && !getApiBaseUrl()) {
+      setShowMobileServerBanner(true)
+    }
+  }, [])
 
   const loadProjects = async () => {
     try {
@@ -75,7 +90,7 @@ export function App() {
   }, [])
 
   useEffect(() => {
-    fetch('/health')
+    testServerConnection()
       .then((res) => setIsBackendConnected(res.ok))
       .catch(() => setIsBackendConnected(false))
   }, [])
@@ -225,6 +240,47 @@ export function App() {
         onOpenSettings={() => setIsSettingsModalOpen(true)}
         isBackendConnected={isBackendConnected}
       />
+
+      {/* Capacitor Mobile Setup Notification Banner */}
+      {showMobileServerBanner && (
+        <div style={{
+          background: 'rgba(234, 179, 8, 0.12)',
+          borderBottom: '1px solid rgba(234, 179, 8, 0.3)',
+          padding: '10px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 12,
+          fontSize: 13,
+          color: '#FDE047',
+          zIndex: 40,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>📱</span>
+            <span><strong>Mobile App:</strong> Connect to your PC backend IP (e.g. <code>http://192.168.1.x:8000</code>) to analyze videos.</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => {
+                setShowMobileServerBanner(false)
+                setIsSettingsModalOpen(true)
+              }}
+              className="btn btn-primary btn-sm"
+              style={{ fontSize: 12, padding: '4px 10px' }}
+            >
+              Configure Server URL
+            </button>
+            <button
+              onClick={() => setShowMobileServerBanner(false)}
+              className="btn btn-ghost btn-sm"
+              style={{ fontSize: 12, padding: '4px 8px', color: '#CBD5E1' }}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       <main className="main-content">
         {view === 'history' && (

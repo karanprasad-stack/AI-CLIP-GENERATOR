@@ -8,16 +8,91 @@ import type {
   PublishHistoryEntry,
 } from '../types'
 
-const API_BASE = '/api'
+const SERVER_URL_KEY = 'ai_clipper_server_url'
+
+/**
+ * Returns the currently configured backend server base URL.
+ * Trailing slashes are stripped. Returns empty string if pointing to same-origin.
+ */
+export function getApiBaseUrl(): string {
+  try {
+    return (localStorage.getItem(SERVER_URL_KEY) || '').trim().replace(/\/+$/, '')
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * Persists the backend server base URL in local storage.
+ * Setting an empty or whitespace string resets to same-origin defaults.
+ */
+export function setApiBaseUrl(url: string): void {
+  try {
+    const cleanUrl = url.trim().replace(/\/+$/, '')
+    if (!cleanUrl) {
+      localStorage.removeItem(SERVER_URL_KEY)
+    } else {
+      localStorage.setItem(SERVER_URL_KEY, cleanUrl)
+    }
+  } catch {
+    // LocalStorage might be restricted in some WebView contexts
+  }
+}
+
+/**
+ * Resolves an absolute or relative path against the configured server base URL.
+ * If no base URL is set, returns the path as-is for same-origin execution.
+ */
+export function resolveApiUrl(path: string): string {
+  const base = getApiBaseUrl()
+  const cleanPath = path.startsWith('/') ? path : `/${path}`
+  if (!base) {
+    return cleanPath
+  }
+  return `${base}${cleanPath}`
+}
+
+/**
+ * Helper to construct endpoints under `/api`.
+ */
+function apiEndpoint(path: string): string {
+  const cleanPath = path.startsWith('/') ? path : `/${path}`
+  return resolveApiUrl(`/api${cleanPath}`)
+}
+
+/**
+ * Tests connection and measures latency to the target backend server.
+ */
+export async function testServerConnection(baseUrl?: string): Promise<{ ok: boolean; latencyMs?: number; error?: string }> {
+  const targetBase = baseUrl !== undefined ? baseUrl.trim().replace(/\/+$/, '') : getApiBaseUrl()
+  const url = targetBase ? `${targetBase}/api/health` : '/api/health'
+  const start = performance.now()
+  try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 6000)
+    const res = await fetch(url, { signal: controller.signal })
+    clearTimeout(timeoutId)
+    const latencyMs = Math.round(performance.now() - start)
+    if (res.ok) {
+      return { ok: true, latencyMs }
+    }
+    return { ok: false, error: `HTTP ${res.status}: ${res.statusText}` }
+  } catch (err: any) {
+    return {
+      ok: false,
+      error: err.name === 'AbortError' ? 'Connection timed out (6s)' : (err.message || 'Connection failed'),
+    }
+  }
+}
 
 export async function fetchProjects(): Promise<ProjectSummary[]> {
-  const res = await fetch(`${API_BASE}/projects`)
+  const res = await fetch(apiEndpoint('/projects'))
   if (!res.ok) throw new Error('Failed to fetch projects')
   return res.json()
 }
 
 export async function fetchProject(id: string): Promise<ProjectDetail> {
-  const res = await fetch(`${API_BASE}/projects/${id}`)
+  const res = await fetch(apiEndpoint(`/projects/${id}`))
   if (!res.ok) throw new Error('Failed to fetch project details')
   return res.json()
 }
@@ -28,7 +103,7 @@ export async function createProject(
   title?: string,
   sourceType?: string
 ): Promise<ProjectDetail> {
-  const res = await fetch(`${API_BASE}/projects`, {
+  const res = await fetch(apiEndpoint('/projects'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: jsonStringify({ url, settings, title, source_type: sourceType || 'normal_video' }),
@@ -38,12 +113,12 @@ export async function createProject(
 }
 
 export async function deleteProject(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/projects/${id}`, { method: 'DELETE' })
+  const res = await fetch(apiEndpoint(`/projects/${id}`), { method: 'DELETE' })
   if (!res.ok) throw new Error('Failed to delete project')
 }
 
 export async function startAnalysis(id: string, settings?: Partial<ProcessingSettings>): Promise<void> {
-  const res = await fetch(`${API_BASE}/projects/${id}/analyze`, {
+  const res = await fetch(apiEndpoint(`/projects/${id}/analyze`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: settings ? jsonStringify(settings) : undefined,
@@ -52,7 +127,7 @@ export async function startAnalysis(id: string, settings?: Partial<ProcessingSet
 }
 
 export async function selectCandidates(id: string, candidateIds: number[]): Promise<void> {
-  const res = await fetch(`${API_BASE}/projects/${id}/select-candidates`, {
+  const res = await fetch(apiEndpoint(`/projects/${id}/select-candidates`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: jsonStringify({ candidate_ids: candidateIds }),
@@ -61,7 +136,7 @@ export async function selectCandidates(id: string, candidateIds: number[]): Prom
 }
 
 export async function startRender(id: string, candidateIds?: number[], settings?: Partial<ProcessingSettings>): Promise<void> {
-  const res = await fetch(`${API_BASE}/projects/${id}/render`, {
+  const res = await fetch(apiEndpoint(`/projects/${id}/render`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: jsonStringify({ candidate_ids: candidateIds, settings }),
@@ -70,7 +145,7 @@ export async function startRender(id: string, candidateIds?: number[], settings?
 }
 
 export async function cancelJob(id: string): Promise<void> {
-  await fetch(`${API_BASE}/projects/${id}/cancel`, { method: 'POST' })
+  await fetch(apiEndpoint(`/projects/${id}/cancel`), { method: 'POST' })
 }
 
 export async function updateMetadata(
@@ -78,7 +153,7 @@ export async function updateMetadata(
   candidateId: number,
   data: { title?: string; description?: string; hashtags?: string[]; keywords?: string[] }
 ): Promise<any> {
-  const res = await fetch(`${API_BASE}/projects/${id}/metadata`, {
+  const res = await fetch(apiEndpoint(`/projects/${id}/metadata`), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: jsonStringify({ candidate_id: candidateId, ...data }),
@@ -88,7 +163,7 @@ export async function updateMetadata(
 }
 
 export async function regenerateMetadata(id: string, candidateId: number): Promise<any> {
-  const res = await fetch(`${API_BASE}/projects/${id}/metadata/regenerate`, {
+  const res = await fetch(apiEndpoint(`/projects/${id}/metadata/regenerate`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: jsonStringify({ candidate_id: candidateId }),
@@ -98,13 +173,13 @@ export async function regenerateMetadata(id: string, candidateId: number): Promi
 }
 
 export async function fetchTimeline(projectId: string, candidateId: number): Promise<any> {
-  const res = await fetch(`${API_BASE}/projects/${projectId}/candidates/${candidateId}/timeline`)
+  const res = await fetch(apiEndpoint(`/projects/${projectId}/candidates/${candidateId}/timeline`))
   if (!res.ok) throw new Error('Failed to fetch candidate timeline')
   return res.json()
 }
 
 export async function saveTimeline(projectId: string, candidateId: number, timeline: any): Promise<any> {
-  const res = await fetch(`${API_BASE}/projects/${projectId}/candidates/${candidateId}/timeline`, {
+  const res = await fetch(apiEndpoint(`/projects/${projectId}/candidates/${candidateId}/timeline`), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: jsonStringify(timeline),
@@ -117,7 +192,7 @@ export async function saveTimeline(projectId: string, candidateId: number, timel
 }
 
 export async function renderTimeline(projectId: string, candidateId: number): Promise<any> {
-  const res = await fetch(`${API_BASE}/projects/${projectId}/candidates/${candidateId}/timeline/render`, {
+  const res = await fetch(apiEndpoint(`/projects/${projectId}/candidates/${candidateId}/timeline/render`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
   })
@@ -130,27 +205,27 @@ export async function renderTimeline(projectId: string, candidateId: number): Pr
 
 export function getPackageDownloadUrl(id: string, candidateId?: number): string {
   return candidateId !== undefined
-    ? `${API_BASE}/projects/${id}/package?candidate_id=${candidateId}`
-    : `${API_BASE}/projects/${id}/package`
+    ? apiEndpoint(`/projects/${id}/package?candidate_id=${candidateId}`)
+    : apiEndpoint(`/projects/${id}/package`)
 }
 
 export async function getOutputDetail(projectId: string, candidateId: number): Promise<any> {
-  const res = await fetch(`${API_BASE}/projects/${projectId}/outputs/${candidateId}`)
+  const res = await fetch(apiEndpoint(`/projects/${projectId}/outputs/${candidateId}`))
   if (!res.ok) throw new Error('Failed to fetch output detail')
   return res.json()
 }
 
 export function getFileUrl(id: string, relativePath: string): string {
   const cleanPath = relativePath.replace(/^.*[\\/]publishing[\\/]/, 'publishing/').replace(/^.*[\\/]output[\\/][^\\/]+[\\/]/, '')
-  return `${API_BASE}/projects/${id}/files/${cleanPath.replace(/\\/g, '/')}`
+  return apiEndpoint(`/projects/${id}/files/${cleanPath.replace(/\\/g, '/')}`)
 }
 
 export function getSourceVideoUrl(id: string): string {
-  return `${API_BASE}/projects/${id}/source-video`
+  return apiEndpoint(`/projects/${id}/source-video`)
 }
 
 export function getProjectAudioUrl(id: string): string {
-  return `${API_BASE}/projects/${id}/audio`
+  return apiEndpoint(`/projects/${id}/audio`)
 }
 
 export function subscribeProjectEvents(
@@ -158,7 +233,7 @@ export function subscribeProjectEvents(
   onEvent: (event: any) => void,
   onError?: (err: any) => void
 ): () => void {
-  const sse = new EventSource(`${API_BASE}/projects/${id}/events`)
+  const sse = new EventSource(apiEndpoint(`/projects/${id}/events`))
 
   sse.onmessage = (e) => {
     try {
@@ -183,7 +258,7 @@ function jsonStringify(obj: any): string {
 }
 
 export async function startLiveSession(id: string): Promise<{ status: string; session_id: string }> {
-  const res = await fetch(`${API_BASE}/projects/${id}/live/start`, { method: 'POST' })
+  const res = await fetch(apiEndpoint(`/projects/${id}/live/start`), { method: 'POST' })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     throw new Error(err.detail || 'Failed to start live stream')
@@ -192,51 +267,51 @@ export async function startLiveSession(id: string): Promise<{ status: string; se
 }
 
 export async function stopLiveSession(id: string): Promise<{ status: string }> {
-  const res = await fetch(`${API_BASE}/projects/${id}/live/stop`, { method: 'POST' })
+  const res = await fetch(apiEndpoint(`/projects/${id}/live/stop`), { method: 'POST' })
   if (!res.ok) throw new Error('Failed to stop live stream')
   return res.json()
 }
 
 export async function pauseLiveSession(id: string): Promise<{ status: string }> {
-  const res = await fetch(`${API_BASE}/projects/${id}/live/pause`, { method: 'POST' })
+  const res = await fetch(apiEndpoint(`/projects/${id}/live/pause`), { method: 'POST' })
   if (!res.ok) throw new Error('Failed to pause live stream')
   return res.json()
 }
 
 export async function resumeLiveSession(id: string): Promise<{ status: string }> {
-  const res = await fetch(`${API_BASE}/projects/${id}/live/resume`, { method: 'POST' })
+  const res = await fetch(apiEndpoint(`/projects/${id}/live/resume`), { method: 'POST' })
   if (!res.ok) throw new Error('Failed to resume live stream')
   return res.json()
 }
 
 export async function fetchLiveStatus(id: string): Promise<any> {
-  const res = await fetch(`${API_BASE}/projects/${id}/live/status`)
+  const res = await fetch(apiEndpoint(`/projects/${id}/live/status`))
   if (!res.ok) throw new Error('Failed to fetch live status')
   return res.json()
 }
 
 export async function fetchLiveCandidates(id: string): Promise<any[]> {
-  const res = await fetch(`${API_BASE}/projects/${id}/live/candidates`)
+  const res = await fetch(apiEndpoint(`/projects/${id}/live/candidates`))
   if (!res.ok) throw new Error('Failed to fetch live candidates')
   const data = await res.json()
   return data.candidates || []
 }
 
 export async function fetchLiveActivity(id: string): Promise<any[]> {
-  const res = await fetch(`${API_BASE}/projects/${id}/live/activity`)
+  const res = await fetch(apiEndpoint(`/projects/${id}/live/activity`))
   if (!res.ok) throw new Error('Failed to fetch live activity')
   const data = await res.json()
   return data.events || []
 }
 
 export async function fetchPublishingPlatforms(): Promise<PlatformStatus[]> {
-  const res = await fetch(`${API_BASE}/publishing/platforms`)
+  const res = await fetch(apiEndpoint('/publishing/platforms'))
   if (!res.ok) throw new Error('Failed to fetch publishing platforms')
   return res.json()
 }
 
 export async function connectPlatform(platform: string, authData?: any): Promise<any> {
-  const res = await fetch(`${API_BASE}/publishing/${platform}/connect`, {
+  const res = await fetch(apiEndpoint(`/publishing/${platform}/connect`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: authData ? JSON.stringify({ auth_data: authData }) : undefined,
@@ -249,7 +324,7 @@ export async function connectPlatform(platform: string, authData?: any): Promise
 }
 
 export async function disconnectPlatform(platform: string): Promise<any> {
-  const res = await fetch(`${API_BASE}/publishing/${platform}/disconnect`, {
+  const res = await fetch(apiEndpoint(`/publishing/${platform}/disconnect`), {
     method: 'POST',
   })
   if (!res.ok) throw new Error('Failed to disconnect platform')
@@ -261,7 +336,7 @@ export async function publishCandidate(
   candidateId: number,
   req: PublishRequest
 ): Promise<PublishResult> {
-  const res = await fetch(`${API_BASE}/projects/${projectId}/candidates/${candidateId}/publish`, {
+  const res = await fetch(apiEndpoint(`/projects/${projectId}/candidates/${candidateId}/publish`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -274,7 +349,7 @@ export async function publishCandidate(
 }
 
 export async function fetchPublishHistory(projectId: string): Promise<PublishHistoryEntry[]> {
-  const res = await fetch(`${API_BASE}/projects/${projectId}/publish-history`)
+  const res = await fetch(apiEndpoint(`/projects/${projectId}/publish-history`))
   if (!res.ok) throw new Error('Failed to fetch publish history')
   return res.json()
 }
@@ -283,7 +358,7 @@ export async function fetchCandidatePublishHistory(
   projectId: string,
   candidateId: number
 ): Promise<PublishHistoryEntry[]> {
-  const res = await fetch(`${API_BASE}/projects/${projectId}/candidates/${candidateId}/publish-history`)
+  const res = await fetch(apiEndpoint(`/projects/${projectId}/candidates/${candidateId}/publish-history`))
   if (!res.ok) throw new Error('Failed to fetch candidate publish history')
   return res.json()
 }

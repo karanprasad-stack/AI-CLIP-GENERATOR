@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Trash2, Video, Sparkles, AlertCircle, CheckCircle2, ChevronRight, Search, Film, Clock } from 'lucide-react'
 import type { ProjectSummary } from '../types'
+import { getFileUrl } from '../api/client'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 import { EmptyState } from './ui/EmptyState'
 
@@ -143,7 +144,7 @@ export const ProjectHistory: React.FC<ProjectHistoryProps> = ({
             const isFailed = proj.status === 'failed'
 
             // Thumbnail URL if candidate 1 exists
-            const thumbUrl = `/api/projects/${proj.id}/files/publishing/candidate_01/thumbnail.jpg`
+            const thumbUrl = getFileUrl(proj.id, 'publishing/candidate_01/thumbnail.jpg')
 
             return (
               <div

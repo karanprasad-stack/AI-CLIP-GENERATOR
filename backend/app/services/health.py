@@ -112,7 +112,7 @@ class HealthChecker:
         return {
             "status": "ok" if is_healthy else "degraded",
             "phase": "7A",
-            "service": "AI Gaming Shorts Generator",
+            "service": "ai-clipper",
             "version": "1.0.0",
             "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
             "ffmpeg": ffmpeg_info,

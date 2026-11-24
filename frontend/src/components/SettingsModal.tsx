@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react'
-import { X, Cpu, Sliders, Volume2, Subtitles, Settings, Share2, CheckCircle, AlertTriangle, RefreshCw, Key } from 'lucide-react'
+import { X, Cpu, Sliders, Volume2, Subtitles, Settings, Share2, CheckCircle, AlertTriangle, RefreshCw, Key, Server, Wifi } from 'lucide-react'
 import type { ProcessingSettings, PlatformStatus } from '../types'
-import { fetchPublishingPlatforms, connectPlatform, disconnectPlatform } from '../api/client'
+import {
+  fetchPublishingPlatforms,
+  connectPlatform,
+  disconnectPlatform,
+  getApiBaseUrl,
+  setApiBaseUrl,
+  testServerConnection,
+} from '../api/client'
 
 interface SettingsModalProps {
   isOpen: boolean
@@ -10,7 +17,7 @@ interface SettingsModalProps {
   onSave: (settings: ProcessingSettings) => void
 }
 
-type TabType = 'general' | 'subtitles' | 'audio' | 'hardware' | 'publishing'
+type TabType = 'general' | 'subtitles' | 'audio' | 'hardware' | 'publishing' | 'connection'
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
@@ -24,6 +31,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isLoadingPlatforms, setIsLoadingPlatforms] = useState(false)
   const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null)
   const [platformActionMsg, setPlatformActionMsg] = useState<{ platform: string; text: string; error?: boolean } | null>(null)
+  const [serverUrlInput, setServerUrlInput] = useState(getApiBaseUrl())
+  const [testingConnection, setTestingConnection] = useState(false)
+  const [connectionResult, setConnectionResult] = useState<{ ok: boolean; latencyMs?: number; error?: string } | null>(null)
+  const [serverSaveSuccess, setServerSaveSuccess] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
@@ -153,6 +164,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           >
             <Share2 size={14} />
             <span>Publishing Accounts</span>
+          </button>
+          <button
+            className={`btn shrink-0 whitespace-nowrap ${activeTab === 'connection' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setActiveTab('connection')}
+            style={{ padding: '6px 14px', fontSize: '0.85rem' }}
+          >
+            <Server size={14} />
+            <span>Server & Mobile</span>
           </button>
         </div>
 
@@ -547,6 +566,145 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                 )
               })}
+            </div>
+          </div>
+        )}
+
+        {/* Tab 6: Server & Mobile Connection */}
+        {activeTab === 'connection' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div className="card" style={{ padding: 16, background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <Server size={18} color="var(--accent-cyan)" />
+                <h3 style={{ fontSize: '1rem', fontWeight: 600 }}>Backend Server Connection</h3>
+              </div>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: 14, lineHeight: 1.5 }}>
+                Connect this workstation or mobile app to any running AI Clipper backend server.
+                Leave blank to automatically connect to the local host (same-origin).
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                  Server Base URL
+                </label>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <input
+                    type="text"
+                    value={serverUrlInput}
+                    onChange={(e) => {
+                      setServerUrlInput(e.target.value)
+                      setConnectionResult(null)
+                      setServerSaveSuccess(false)
+                    }}
+                    placeholder="http://192.168.1.50:8000 or https://your-server.com"
+                    style={{
+                      flex: 1,
+                      minWidth: 220,
+                      background: 'rgba(0,0,0,0.3)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: 8,
+                      padding: '8px 12px',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.85rem',
+                      fontFamily: 'monospace',
+                    }}
+                  />
+                  <button
+                    className="btn btn-secondary"
+                    onClick={async () => {
+                      setTestingConnection(true)
+                      setConnectionResult(null)
+                      const res = await testServerConnection(serverUrlInput)
+                      setConnectionResult(res)
+                      setTestingConnection(false)
+                    }}
+                    disabled={testingConnection}
+                    style={{ fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: 6 }}
+                  >
+                    <RefreshCw size={14} className={testingConnection ? 'animate-spin' : ''} />
+                    <span>{testingConnection ? 'Testing...' : 'Test Connection'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Status indicators */}
+              {connectionResult && (
+                <div style={{
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  marginBottom: 14,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  fontSize: '0.82rem',
+                  background: connectionResult.ok ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                  border: `1px solid ${connectionResult.ok ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+                  color: connectionResult.ok ? '#4ade80' : '#f87171',
+                }}>
+                  {connectionResult.ok ? <CheckCircle size={16} /> : <AlertTriangle size={16} />}
+                  <span>
+                    {connectionResult.ok
+                      ? `Server Reachable! Latency: ${connectionResult.latencyMs}ms`
+                      : `Connection Error: ${connectionResult.error}`}
+                  </span>
+                </div>
+              )}
+
+              {serverSaveSuccess && (
+                <div style={{
+                  padding: '8px 12px',
+                  borderRadius: 8,
+                  marginBottom: 14,
+                  fontSize: '0.8rem',
+                  background: 'rgba(56, 189, 248, 0.12)',
+                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                  color: '#38bdf8',
+                }}>
+                  Settings saved. Server URL applied.
+                </div>
+              )}
+
+              {/* Save / Reset Actions */}
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    setApiBaseUrl(serverUrlInput)
+                    setServerSaveSuccess(true)
+                    setTimeout(() => setServerSaveSuccess(false), 2500)
+                  }}
+                  style={{ fontSize: '0.82rem', padding: '6px 14px' }}
+                >
+                  Save Server URL
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setServerUrlInput('')
+                    setApiBaseUrl('')
+                    setConnectionResult(null)
+                    setServerSaveSuccess(true)
+                    setTimeout(() => setServerSaveSuccess(false), 2500)
+                  }}
+                  style={{ fontSize: '0.82rem', padding: '6px 14px' }}
+                >
+                  Reset to Same-Origin
+                </button>
+              </div>
+            </div>
+
+            {/* Mobile / Remote Instructions Card */}
+            <div className="card" style={{ padding: 16, background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Wifi size={14} color="var(--accent-purple)" />
+                <span>Mobile APK Connection Guide</span>
+              </div>
+              <ol style={{ paddingLeft: 18, margin: 0 }}>
+                <li>Make sure your PC and mobile device are connected to the same Wi-Fi network (or Tailscale VPN).</li>
+                <li>Find your PC's IP address: run <code>ipconfig</code> in Windows PowerShell and look for <em>IPv4 Address</em> (e.g. <code>192.168.1.50</code>).</li>
+                <li>Start the AI Clipper backend: <code>uvicorn backend.app.server:app --host 0.0.0.0 --port 8000</code> or run via Docker.</li>
+                <li>Enter <code>http://&lt;PC-IP&gt;:8000</code> in the field above and tap <strong>Test Connection</strong> then <strong>Save Server URL</strong>.</li>
+              </ol>
             </div>
           </div>
         )}

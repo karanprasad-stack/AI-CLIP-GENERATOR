@@ -1,0 +1,56 @@
+# Git & CI/CD
+.git/
+.github/
+.gitignore
+
+# Cache & Local Storage
+output/
+temp/
+cache/
+models/
+
+# Local Credentials & Secrets
+config/credentials/
+*client_secret*.json
+*_token.json
+.env
+.env.*
+
+# Node & Frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/android/
+
+# Python Virtual Environments & Bytecode
+venv/
+.venv/
+env/
+ENV/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Tests & Coverage
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs & Media files
+*.log
+*.mp4
+*.mkv
+*.webm
+*.wav
+*.mp3
+*.png
+*.jpg
+*.jpeg
+
+# IDE & OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  ai-clipper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-clipper
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./output:/app/output
+      - ./config:/app/config
+      - ./assets:/app/assets
+    environment:
+      - CORS_ALLOWED_ORIGINS=http://localhost:5173,capacitor://localhost
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # To enable NVIDIA GPU acceleration in Docker, uncomment the lines below:
+    # (Requires NVIDIA Container Toolkit installed on the host)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
